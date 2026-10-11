@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+/data/
+apps/api/assets/fonts/*.ttf
+apps/web/public/mediapipe/
+apps/api/src/generated/
+.DS_Store

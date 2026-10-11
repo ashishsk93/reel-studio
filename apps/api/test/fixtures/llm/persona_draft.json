@@ -1,0 +1,24 @@
+{
+  "output": {
+    "name": "Riya Sharma",
+    "age": 24,
+    "city": "Jaipur",
+    "identityBlock": "Riya Sharma, a 24-year-old Rajasthani woman from Jaipur, clearly a young adult in her mid-twenties. Warm wheatish-golden skin with a soft natural sheen and realistic texture. Heart-shaped face with high, rounded cheekbones and a softly pointed chin, wide-set dark-brown eyes with a bright, teasing look, softly arched medium-thick eyebrows, slightly upturned nose, medium-full lips with a defined cupid's bow. Shoulder-length wavy black hair with a deep side parting, usually tucked behind her left ear. Tiny silver studs and a thin oxidised-silver ring on her right index finger. Slim build, about 5'3\". Signature look: terracotta matte lip and a soft brown smudged liner, otherwise light makeup. Easy, open-mouthed laugh. An original person, not a celebrity or real individual.",
+    "shortIdentity": "24-year-old Rajasthani woman, warm wheatish-golden skin, heart-shaped face with high rounded cheekbones, wide-set dark-brown eyes, slightly upturned nose, shoulder-length wavy black hair with a deep side parting tucked behind her left ear, tiny silver studs, terracotta matte lip, easy laugh",
+    "signatureDetails": [
+      "terracotta matte lip",
+      "hair tucked behind her left ear",
+      "thin oxidised-silver ring on her right index finger"
+    ],
+    "forbiddenFeatures": ["no nose ring or nose piercing", "no visible tattoos"],
+    "conditionalFeatures": [],
+    "voiceNotes": "Sunny, chatty Hinglish with a little Rajasthani flavour; teasing but kind.",
+    "exampleLines": ["Block print season is open 🌸", "Haan, ye mera hai. Ab tumhara bhi.", "Cotton, but make it a moment"],
+    "personality": "Sunny, chatty, easy-going, quick to laugh.",
+    "lane": "Block prints, cotton co-ords and summer festive; Teej, Gangaur and destination weddings.",
+    "hashtag": "#RiyaPicks",
+    "defaultStyling": "Easy boho: silver jewellery, side-parted waves, terracotta lip.",
+    "homeOutfit": "a loose pastel-pink cotton shirt and white pyjama shorts",
+    "homeSetting": "a sunlit Jaipur bedroom with a pink jaali window, a carved wooden headboard and block-printed bedsheets"
+  }
+}

@@ -1,0 +1,396 @@
+// Reel Studio data model. SQLite locally; kept Postgres-compatible:
+// enum-like fields are Strings validated by zod unions from @reel/shared,
+// lists/objects are Json, file paths are relative to DATA_DIR.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- Influencers ----------
+
+model Influencer {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  name                String
+  age                 Int
+  city                String
+  identityBlock       String
+  shortIdentity       String
+  voiceNotes          String
+  exampleLines        Json // string[]
+  personality         String
+  lane                String
+  hashtag             String
+  signatureDetails    Json // string[]
+  forbiddenFeatures   Json // string[]
+  conditionalFeatures Json // { feature, rule }[]
+  defaultStyling      String
+  homeOutfit          String
+  homeSetting         String
+  status              String   @default("active") // draft | creating | active | archived
+  creatorBrief        Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  references   ReferenceImage[]
+  creatorTasks CreatorTask[]
+  projects     Project[]
+}
+
+model ReferenceImage {
+  id            String   @id @default(cuid())
+  influencerId  String
+  path          String
+  width         Int
+  height        Int
+  tags          Json // RefTag[]
+  note          String   @default("")
+  sortOrder     Int      @default(0)
+  creatorTaskId String?  @unique
+  createdAt     DateTime @default(now())
+
+  influencer  Influencer   @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  creatorTask CreatorTask? @relation(fields: [creatorTaskId], references: [id], onDelete: SetNull)
+
+  @@index([influencerId])
+}
+
+// One step in a new character's reference-image plan (anchor first, then the rest)
+model CreatorTask {
+  id           String   @id @default(cuid())
+  influencerId String
+  order        Int
+  tag          String
+  purpose      String
+  prompt       String
+  imageModel   String
+  modelReason  String
+  attachments  Json // AttachmentRef[]
+  status       String   @default("locked") // locked | ready | in_review | approved | skipped
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  influencer Influencer      @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  assets     Asset[]
+  reference  ReferenceImage?
+
+  @@index([influencerId, order])
+}
+
+model Source {
+  id              String  @id @default(cuid())
+  key             String  @unique // amazon | myntra | meesho
+  displayName     String
+  logoPath        String?
+  priceMode       String // exact | under_band | hidden
+  disclosureLines Json // string[]
+  linkNotes       String  @default("")
+
+  projects Project[]
+}
+
+// ---------- Projects ----------
+
+model Project {
+  id                String    @id @default(cuid())
+  influencerId      String
+  sourceId          String
+  productTitle      String
+  priceInr          Int
+  priceModeOverride String?
+  productUrl        String?
+  affiliateLink     String?
+  occasion          String
+  status            String    @default("draft")
+  furthestStatus    String    @default("draft")
+  videoMode         String    @default("multi_shot") // multi_shot | single
+  postedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  influencer    Influencer      @relation(fields: [influencerId], references: [id])
+  source        Source          @relation(fields: [sourceId], references: [id])
+  productImages ProductImage[]
+  spec          ProductSpec?
+  scenes        Scene[]
+  videoJobs     VideoJob[]
+  assets        Asset[]
+  segments      Segment[]
+  composition   Composition?
+  captions      CaptionPackage?
+  renders       Render[]
+  llmCalls      LlmCall[]
+  jobs          Job[]
+}
+
+model ProductImage {
+  id        String @id @default(cuid())
+  projectId String
+  path      String
+  width     Int
+  height    Int
+  role      String // front | back | detail | pants | lifestyle | other
+  order     Int
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, order])
+}
+
+model ProductSpec {
+  id               String   @id @default(cuid())
+  projectId        String   @unique
+  spec             Json
+  mustMatch        Json // { key, label, expected }[]
+  unknowns         Json // string[]
+  garmentParagraph String
+  version          Int      @default(1)
+  editedByUser     Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Scene {
+  id                String   @id @default(cuid())
+  projectId         String
+  order             Int
+  type              String
+  purpose           String
+  onScreenText      String
+  targetDurationSec Float
+  setting           String
+  outfitState       String // own_clothes | wearing_product
+  showsProduct      Boolean  @default(true)
+  imagePrompt       String
+  imageModel        String
+  imageModelReason  String
+  attachments       Json // AttachmentRef[]
+  motion            String
+  approvedAssetId   String?  @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets        Asset[]            @relation("SceneAssets")
+  approvedAsset Asset?             @relation("SceneApproved", fields: [approvedAssetId], references: [id], onDelete: SetNull)
+  segment       Segment?
+  messages      AssistantMessage[]
+
+  @@index([projectId, order])
+}
+
+// Uploaded generated image or video. Exactly one owner: scene, video job, or creator task.
+model Asset {
+  id             String   @id @default(cuid())
+  projectId      String?
+  sceneId        String?
+  videoJobId     String?
+  creatorTaskId  String?
+  kind           String // image | video
+  version        Int
+  path           String
+  normalizedPath String?
+  mime           String
+  width          Int
+  height         Int
+  durationSec    Float?
+  probe          Json?
+  detectedCuts   Json? // number[]
+  shotBounds     Json? // { sceneId, start, end }[]
+  status         String   @default("pending_review") // pending_review | approved | rejected
+  sourcePrompt   String   @default("")
+  createdAt      DateTime @default(now())
+
+  project     Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene       Scene?             @relation("SceneAssets", fields: [sceneId], references: [id], onDelete: Cascade)
+  approvedFor Scene?             @relation("SceneApproved")
+  videoJob    VideoJob?          @relation(fields: [videoJobId], references: [id], onDelete: Cascade)
+  creatorTask CreatorTask?       @relation(fields: [creatorTaskId], references: [id], onDelete: Cascade)
+  reviews     Review[]
+  segments    Segment[]
+  messages    AssistantMessage[]
+
+  @@index([sceneId])
+  @@index([videoJobId])
+  @@index([creatorTaskId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  assetId    String
+  verdict    String // pass | warn | fail
+  checklist  Json
+  issues     Json
+  fixPrompts Json
+  shots      Json?
+  model      String
+  llmCallId  String?
+  createdAt  DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
+
+model VideoJob {
+  id             String   @id @default(cuid())
+  projectId      String
+  mode           String // multi_shot | single
+  order          Int
+  active         Boolean  @default(true)
+  prompt         String
+  startAssetId   String
+  extraRefs      Json // AttachmentRef[]
+  expectedShots  Json // { sceneId, start, end, text }[]
+  settings       Json
+  creditEstimate Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets  Asset[]
+
+  @@index([projectId, mode, order])
+}
+
+model Segment {
+  id               String  @id @default(cuid())
+  projectId        String
+  sceneId          String  @unique
+  assetId          String
+  order            Int
+  inSec            Float
+  outSec           Float
+  suggestedInSec   Float?
+  suggestedOutSec  Float?
+  onScreenText     String
+  textBox          Json?
+  detections       Json?
+  badgeEnabled     Boolean @default(true)
+  badgePlacement   Json?
+  placementWarning String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, order])
+}
+
+model Composition {
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  cta       Json
+  cover     Json
+  music     Json?
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model CaptionPackage {
+  id           String   @id @default(cuid())
+  projectId    String   @unique
+  caption      String
+  hashtags     Json
+  firstComment String?
+  dmTemplate   String
+  coverTitles  Json
+  sceneTexts   Json
+  checklist    Json
+  updatedAt    DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Render {
+  id         String    @id @default(cuid())
+  projectId  String
+  status     String
+  settings   Json
+  outputDir  String
+  probe      Json?
+  qa         Json?
+  warnings   Json
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// Modification assistant history: per asset, or per scene before any upload
+model AssistantMessage {
+  id        String   @id @default(cuid())
+  assetId   String?
+  sceneId   String?
+  role      String // user | assistant
+  content   String
+  output    Json?
+  createdAt DateTime @default(now())
+
+  asset Asset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  scene Scene? @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([sceneId])
+}
+
+// ---------- Infra ----------
+
+model LlmCall {
+  id               String   @id @default(cuid())
+  task             String
+  model            String
+  projectId        String?
+  influencerId     String?
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  costUsd          Float
+  latencyMs        Int
+  attempts         Int      @default(1)
+  ok               Boolean
+  error            String?
+  createdAt        DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model Job {
+  id             String    @id @default(cuid())
+  type           String
+  status         String    @default("queued") // queued | running | succeeded | failed | cancelled
+  idempotencyKey String?   @unique
+  projectId      String?
+  payload        Json
+  result         Json?
+  error          String?
+  progress       Float     @default(0)
+  message        String    @default("")
+  attempts       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([projectId])
+}
