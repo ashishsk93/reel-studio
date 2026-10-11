@@ -93,3 +93,10 @@ export type LlmMode = (typeof LLM_MODES)[number];
 
 export const EFFORT_LEVELS = ['low', 'medium', 'high'] as const;
 export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+
+/** Framing of a scene; drives which reference images get attached. */
+export const SHOT_KINDS = ['full_body', 'three_quarter', 'back', 'medium', 'closeup', 'hands'] as const;
+export type ShotKind = (typeof SHOT_KINDS)[number];
+
+export const TRANSPARENCY = ['opaque', 'semi_sheer', 'sheer'] as const;
+export type Transparency = (typeof TRANSPARENCY)[number];

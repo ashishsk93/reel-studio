@@ -9,6 +9,7 @@ import {
   slugify,
   tidyPrompt,
 } from './persona-text';
+import { SETTINGS } from '@reel/shared';
 import { buildSamplePrompt } from './sample-prompt';
 import type { ReferenceImage } from '../generated/prisma/client';
 
@@ -54,13 +55,18 @@ describe('persona text helpers', () => {
 
 describe('sample prompt', () => {
   const prompts = new PromptService();
+  const options = (fileUrl: (rel: string) => string | null) => ({
+    prompts,
+    rules: structuredClone(SETTINGS['storyboard.refRules'].default) as never,
+    maxRefs: 4,
+    fileUrl,
+  });
 
   it('fills the wearing template with no placeholders and orders attachments anchor first', () => {
     const card = buildSamplePrompt(
       aanya,
       [ref('base', ['base_front'], 0), ref('anc', ['anchor'], 1), ref('hands', ['hands'], 2)],
-      prompts,
-      (rel) => `http://files/${rel}`,
+      options((rel) => `http://files/${rel}`),
     );
     expect(card.prompt).not.toMatch(/\{\{|\[|\]/);
     expect(card.prompt.startsWith('Images 1 and 2 show Aanya.')).toBe(true);
@@ -75,8 +81,8 @@ describe('sample prompt', () => {
   });
 
   it('reports missing reference tags', () => {
-    const card = buildSamplePrompt(aanya, [], prompts, () => null);
-    expect(card.prompt.startsWith('Image 1 shows Aanya.')).toBe(true);
+    const card = buildSamplePrompt(aanya, [], options(() => null));
+    expect(card.prompt.startsWith('The images show a product:')).toBe(true);
     expect(card.missing).toHaveLength(2);
   });
 });

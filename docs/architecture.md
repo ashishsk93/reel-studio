@@ -276,6 +276,10 @@ model Scene {
   targetDurationSec Float
   setting           String
   outfitState       String   // own_clothes | wearing_product
+  shotKind          String   // full_body | three_quarter | back | medium | closeup | hands (added in phase 2)
+  description       String   // scene sentence(s) inserted into the template (phase 2)
+  productRoles      Json?    // product image roles, most relevant first (phase 2)
+  promptOverride    Boolean  // imagePrompt edited by hand (phase 2)
   showsProduct      Boolean  @default(true) // drives badge eligibility
   imagePrompt       String
   imageModel        String   // gpt_image | nano_banana

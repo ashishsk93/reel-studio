@@ -21,6 +21,7 @@ import { parseOrThrow } from '../common/zod';
 import { toJson } from '../common/json';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import { inspectImage } from '../storage/uploads';
 import {
@@ -43,6 +44,7 @@ export class InfluencersService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly prompts: PromptService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(): Promise<InfluencerDto[]> {
@@ -172,12 +174,13 @@ export class InfluencersService {
 
   async samplePrompt(id: string): Promise<PromptCardDto> {
     const influencer = await this.find(id);
-    return buildSamplePrompt(
-      { ...influencer, ...personaOf(influencer) },
-      influencer.references,
-      this.prompts,
-      (rel) => this.storage.url(rel),
-    );
+    const [rules, tools] = await Promise.all([this.settings.get('storyboard.refRules'), this.settings.get('tools.image')]);
+    return buildSamplePrompt({ ...influencer, ...personaOf(influencer) }, influencer.references, {
+      prompts: this.prompts,
+      rules,
+      maxRefs: Math.min(...Object.values(tools).map((t) => t.maxRefs)),
+      fileUrl: (rel) => this.storage.url(rel),
+    });
   }
 
   private async find(id: string) {

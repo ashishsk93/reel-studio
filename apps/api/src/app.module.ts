@@ -4,6 +4,7 @@ import type { AppConfig } from './config/env';
 import type { ToolVersions } from './config/startup-checks';
 import { HealthController } from './health/health.controller';
 import { InfluencersModule } from './influencers/influencers.module';
+import { ProjectsModule } from './projects/projects.module';
 import { JobsModule } from './jobs/jobs.module';
 import { LlmModule } from './llm/llm.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -25,6 +26,7 @@ export class AppModule {
         JobsModule,
         LlmModule,
         InfluencersModule,
+        ProjectsModule,
         SourcesModule,
         UsageModule,
       ],

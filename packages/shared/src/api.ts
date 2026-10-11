@@ -1,11 +1,19 @@
 import type {
+  ImageModel,
   InfluencerStatus,
   JobStatus,
   LlmTask,
+  OutfitState,
   PriceMode,
+  ProductImageRole,
+  ProjectStatus,
   RefTag,
+  SceneType,
+  ShotKind,
   SourceKey,
+  VideoMode,
 } from './enums.js';
+import type { MustMatchItem, ProductSpec } from './llm/product.js';
 import type { ConditionalFeature } from './schemas/influencer.js';
 
 /** Response shapes shared by the API and the web app. Dates are ISO strings. */
@@ -68,6 +76,85 @@ export interface PromptCardDto {
   attachments: AttachmentDto[];
   missing: string[];
   notes: string[];
+}
+
+export interface ProductImageDto {
+  id: string;
+  path: string;
+  url: string;
+  width: number;
+  height: number;
+  role: ProductImageRole;
+  order: number;
+}
+
+export interface ProjectSummaryDto {
+  id: string;
+  productTitle: string;
+  priceInr: number;
+  occasion: string;
+  status: ProjectStatus;
+  furthestStatus: ProjectStatus;
+  influencer: { id: string; name: string; anchorUrl: string | null };
+  source: { id: string; key: SourceKey; displayName: string };
+  coverUrl: string | null;
+  sceneCount: number;
+  createdAt: string;
+  updatedAt: string;
+  postedAt: string | null;
+}
+
+export interface ProjectDto extends ProjectSummaryDto {
+  priceModeOverride: PriceMode | null;
+  /** The mode actually used for the badge: the override, or the source's mode. */
+  priceMode: PriceMode;
+  priceLabel: string | null;
+  productUrl: string | null;
+  affiliateLink: string | null;
+  videoMode: VideoMode;
+  productImages: ProductImageDto[];
+}
+
+export interface ProductSpecDto {
+  id: string;
+  projectId: string;
+  spec: ProductSpec;
+  mustMatch: MustMatchItem[];
+  unknowns: string[];
+  garmentParagraph: string;
+  version: number;
+  editedByUser: boolean;
+  updatedAt: string;
+}
+
+export interface SceneDto {
+  id: string;
+  projectId: string;
+  order: number;
+  type: SceneType;
+  purpose: string;
+  shotKind: ShotKind;
+  outfitState: OutfitState;
+  showsProduct: boolean;
+  setting: string;
+  description: string;
+  productRoles: ProductImageRole[];
+  onScreenText: string;
+  targetDurationSec: number;
+  imageModel: ImageModel;
+  imageModelReason: string;
+  motion: string;
+  imagePrompt: string;
+  promptOverride: boolean;
+  card: PromptCardDto;
+  updatedAt: string;
+}
+
+export interface StoryboardDto {
+  scenes: SceneDto[];
+  notes: string[];
+  totalSec: number;
+  ctaSec: number;
 }
 
 export interface SourceDto {

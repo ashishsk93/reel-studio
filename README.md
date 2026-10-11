@@ -9,7 +9,7 @@ The brief is in [docs/reel_studio_claude_code_prompt.md](docs/reel_studio_claude
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Skeleton, settings, influencer and source CRUD, character-creator persona step, `LlmService`, cost log, jobs and SSE | ✅ |
-| 2 | New project, product analysis, storyboard, attachment zips | — |
+| 2 | New project, product analysis, storyboard, attachment zips | ✅ |
 | 3 | Image review, fix prompts, modification assistant, character-creator reference plan | — |
 | 4 | Video prompts, cut detection, video review, timeline editor | — |
 | 5 | Compose, badge placement, CTA, cover, captions, render, export | — |
@@ -57,6 +57,16 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
 
 - **Poppins ExtraBold** (`Poppins-ExtraBold.ttf`) from Google Fonts: https://fonts.google.com/specimen/Poppins
 - **Noto Color Emoji** (`NotoColorEmoji.ttf`): https://fonts.google.com/noto/specimen/Noto+Color+Emoji
+
+## Making a Reel (steps 1–3)
+
+1. **Projects → New project.** Drop the listing photos and tag each one (front, back, detail, pants…). Pick the source, price, occasion and influencer. The badge preview shows how the price will appear (Amazon defaults to "Under ₹X").
+2. **Analysis** starts automatically. Claude writes the garment spec, a 6–10 item must-match checklist, the unknowns (never put in prompts) and the paste-ready garment paragraph. Edit anything, then **Save**. **Rewrite from spec** rebuilds the paragraph from your edits.
+3. **Storyboard.** Claude plans the scenes; the app assembles every prompt from the persona, the garment paragraph and the templates in `apps/api/src/prompts/templates/`, so there are never placeholders. Each scene shows its prompt, the images to attach in order, the recommended image model, and a zip with the attachments renamed `1_aanya_anchor.jpg`, `2_product_front.jpg`… **All attachments + prompts** downloads every scene in one zip.
+
+Reference images are chosen by the rules in **Settings → Reference image selection rules** (anchor first; `base_front` or `base_hair_up` for full-body shots; `base_three_quarter` for ¾; `turnaround` for back views; anchor only for close-ups), within each image tool's reference limit.
+
+Check the live API connection any time with `pnpm --filter @reel/api llm:check` (one tiny call per configured model).
 
 ## Adding an influencer
 

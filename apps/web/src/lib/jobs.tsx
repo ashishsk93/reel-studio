@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { JobDto } from "@reel/shared";
 import { API_URL, api, errorMessage } from "./api";
@@ -104,4 +105,40 @@ export function useJobWatcher() {
       });
     return watch;
   }, [events]);
+}
+
+const ACTIVE = new Set(["queued", "running"]);
+
+/**
+ * Live job list for one project: seeded from the API, kept current over SSE. When a job
+ * succeeds, the project's queries (project, spec, storyboard) are refetched.
+ */
+export function useProjectJobs(projectId: string) {
+  const events = useContext(JobEventsContext);
+  const queryClient = useQueryClient();
+  const key = useMemo(() => ["jobs", projectId] as const, [projectId]);
+  const { data = [] } = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<JobDto[]>(`/jobs?projectId=${projectId}&limit=30`),
+  });
+
+  useEffect(() => {
+    if (!events) return;
+    return events.subscribe((job) => {
+      if (job.projectId !== projectId) return;
+      queryClient.setQueryData<JobDto[]>(key, (old = []) => [job, ...old.filter((j) => j.id !== job.id)]);
+      if (job.status === "succeeded") void queryClient.invalidateQueries({ queryKey: ["projects", projectId] });
+    });
+  }, [events, projectId, queryClient, key]);
+
+  return useMemo(() => {
+    const latest = (type: string) => data.find((j) => j.type === type);
+    return {
+      latest,
+      active: (type: string) => {
+        const job = latest(type);
+        return job && ACTIVE.has(job.status) ? job : undefined;
+      },
+    };
+  }, [data]);
 }

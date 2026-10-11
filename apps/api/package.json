@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "db:generate": "prisma generate",
+    "llm:check": "tsx scripts/llm-check.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
@@ -22,6 +23,7 @@
     "@prisma/adapter-better-sqlite3": "7.10.0",
     "@prisma/client": "7.10.0",
     "@reel/shared": "workspace:*",
+    "archiver": "^7.0.1",
     "dotenv": "^18.0.7",
     "multer": "^2.4.0",
     "reflect-metadata": "^0.2.2",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.0",
+    "@types/archiver": "^6.0.4",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.0.0",
