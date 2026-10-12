@@ -29,6 +29,8 @@ export interface SelectionInput {
   products: ProductCandidate[];
   rules: RefRules;
   maxRefs: number;
+  /** Her room for this scene (a reference tagged "background"), attached last. */
+  background?: RefCandidate | null;
 }
 
 export interface SelectedAttachment {
@@ -44,6 +46,8 @@ export interface Selection {
   attachments: SelectedAttachment[];
   /** How many leading images show the influencer ("Images 1 and 2 show …"). */
   personCount: number;
+  /** Number of the background image (always the last attachment), or null. */
+  backgroundIndex: number | null;
   missing: string[];
   notes: string[];
 }
@@ -132,13 +136,15 @@ export function selectAttachments(input: SelectionInput): Selection {
     if (products.length === 0) missing.push('No product images uploaded');
   }
 
-  // Fit the limit: anchor and the best product image first, then the rest by priority.
+  // Fit the limit: anchor, the best product image and the background first, then the rest by priority.
   const limit = Math.max(1, input.maxRefs);
   const keepPeople = people.slice(0, 1);
   const keepProducts = products.slice(0, 1);
   const extraPeople = people.slice(1);
   const extraProducts = products.slice(1);
-  let room = limit - keepPeople.length - keepProducts.length;
+  const background = input.background && limit - keepPeople.length - keepProducts.length > 0 ? input.background : null;
+  if (input.background && !background) notes.push(`Left out the background to stay within ${limit} images.`);
+  let room = limit - keepPeople.length - keepProducts.length - (background ? 1 : 0);
   while (room > 0 && extraPeople.length) {
     keepPeople.push(extraPeople.shift()!);
     room--;
@@ -179,5 +185,18 @@ export function selectAttachments(input: SelectionInput): Selection {
     });
   }
 
-  return { attachments, personCount: keepPeople.length, missing, notes };
+  let backgroundIndex: number | null = null;
+  if (background) {
+    backgroundIndex = attachments.length + 1;
+    attachments.push({
+      index: backgroundIndex,
+      kind: 'reference',
+      id: background.id,
+      path: background.path,
+      label: 'Background (her room)',
+      fileName: `${backgroundIndex}_background${ext(background.path)}`,
+    });
+  }
+
+  return { attachments, personCount: keepPeople.length, backgroundIndex, missing, notes };
 }

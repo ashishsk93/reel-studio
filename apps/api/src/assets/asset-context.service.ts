@@ -194,6 +194,7 @@ export class AssetContextService {
       `Requested framing: ${card.frame.framing(inf.name.split(' ')[0])}`,
       `Expected aspect ratio: ${card.frame.aspect}`,
       task.tag === 'anchor' ? 'This is the anchor: there is no earlier reference; judge it against the identity description.' : '',
+      task.tag === 'background' ? `This is her room with nobody in it. Her home setting: ${inf.homeSetting}` : '',
       '',
       'The prompt that was used:',
       asset.sourcePrompt || card.prompt,

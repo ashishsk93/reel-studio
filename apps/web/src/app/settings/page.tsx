@@ -222,9 +222,9 @@ function ToolsCard({ image, video }: { image: SettingRow<"tools.image">; video: 
         <div className="flex flex-col gap-3 rounded-lg border p-4 md:col-span-2">
           <p className="text-sm font-medium">{vid.label} (video)</p>
           <div className="grid gap-3 sm:grid-cols-4">
-            {num("Max element references", vid.maxElementRefs, (n) => setVid({ ...vid, maxElementRefs: n }))}
-            {num("Max multi-shot length (s)", vid.maxMultiShotSec, (n) => setVid({ ...vid, maxMultiShotSec: n }))}
-            {num("Single-shot length (s)", vid.singleShotSec, (n) => setVid({ ...vid, singleShotSec: n }))}
+            {num("Max length per run (s)", vid.maxMultiShotSec, (n) => setVid({ ...vid, maxMultiShotSec: n }))}
+            {num("Shortest generation (s)", vid.minSec, (n) => setVid({ ...vid, minSec: n }))}
+            {num("Extra seconds per shot", vid.shotPaddingSec, (n) => setVid({ ...vid, shotPaddingSec: n }), 0.5)}
             {num("Credits per 5 s", vid.creditsPer5s, (n) => setVid({ ...vid, creditsPer5s: n }), 0.01)}
           </div>
         </div>

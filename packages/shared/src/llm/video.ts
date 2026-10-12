@@ -17,6 +17,10 @@ export const ShotReviewSchema = z.object({
   issues: z.array(ShotIssueSchema),
   usableFrom: z.number().nullable().describe('Earliest video time (s) that is clean; null = from the start of the shot'),
   usableTo: z.number().nullable().describe('Latest video time (s) before drift or artefacts start; null = to the end of the shot'),
+  bestFrom: z
+    .number()
+    .nullable()
+    .describe("Video time (s) where the best window of the shot's target length starts, inside the usable part; null = start of the usable part"),
 });
 export type ShotReview = z.infer<typeof ShotReviewSchema>;
 
@@ -56,6 +60,7 @@ export function videoReviewChecked(c: { shotCount: number; durationSec: number }
       if (s.usableFrom !== null && s.usableTo !== null && s.usableFrom >= s.usableTo) {
         ctx.addIssue({ code: 'custom', path: ['shots', i], message: 'usableFrom must be before usableTo' });
       }
+      if (!inRange(s.bestFrom)) ctx.addIssue({ code: 'custom', path: ['shots', i], message: `bestFrom must be within 0-${c.durationSec}s` });
     });
     const serious = out.shots.some((s) => s.verdict === 'fail' || s.issues.some((x) => x.severity !== 'minor'));
     if (out.verdict === 'pass' && serious) {

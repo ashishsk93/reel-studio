@@ -77,6 +77,7 @@ const StoredShotSchema = z.object({
   issues: z.array(z.object({ severity: z.enum(ISSUE_SEVERITIES), description: z.string(), fromSec: z.number().nullable(), toSec: z.number().nullable() })),
   usableFrom: z.number().nullable(),
   usableTo: z.number().nullable(),
+  bestFrom: z.number().nullable().optional(),
   suggestedIn: z.number(),
   suggestedOut: z.number(),
 });
@@ -381,7 +382,8 @@ export class VideoAssetsService implements OnModuleInit {
     const bounds: ShotBoundDto[] = mapped.map((b, i) => ({ ...b, ...suggestWindow(b, expected[i].targetSec), manual: false }));
 
     await progress(0.7, 'Extracting frames');
-    const times = planFrameTimes(duration, bounds, cuts);
+    // Denser sampling on short clips, so the review can place the best window precisely.
+    const times = planFrameTimes(duration, bounds, cuts, { fps: duration <= 8 ? 3 : 2 });
     const frameDir = `projects/${projectId}/frames/${asset.id}`;
     const files = await this.media.extractFrames(
       this.storage.abs(normalizedRel),
@@ -479,7 +481,7 @@ export class VideoAssetsService implements OnModuleInit {
 
     const shots = out.shots.map((s, i) => {
       const b = bounds[i];
-      const window = suggestWindow(b, expected[i]?.targetSec ?? 2.5, { usableFrom: s.usableFrom, usableTo: s.usableTo });
+      const window = suggestWindow(b, expected[i]?.targetSec ?? 2.5, { usableFrom: s.usableFrom, usableTo: s.usableTo, bestFrom: s.bestFrom });
       return { ...s, sceneId: b.sceneId, suggestedIn: window.inSec, suggestedOut: window.outSec };
     });
     // Reviews move the windows the user hasn't touched.
@@ -572,7 +574,7 @@ export class VideoAssetsService implements OnModuleInit {
         : expected.map((e) => ({ sceneId: e.sceneId, start: 0, end: snap(duration), matched: true }));
     const bounds = mapped.map((b, i) => ({
       ...b,
-      ...suggestWindow(b, expected[i].targetSec, { usableFrom: shots[i]?.usableFrom, usableTo: shots[i]?.usableTo }),
+      ...suggestWindow(b, expected[i].targetSec, { usableFrom: shots[i]?.usableFrom, usableTo: shots[i]?.usableTo, bestFrom: shots[i]?.bestFrom }),
       manual: false,
     }));
     await this.prisma.asset.update({ where: { id: assetId }, data: { shotBounds: toJson(bounds) } });

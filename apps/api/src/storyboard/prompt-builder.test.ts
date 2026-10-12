@@ -42,6 +42,22 @@ describe('buildImagePrompt', () => {
     expect(prompt).not.toContain('lounge shorts');
   });
 
+  it('numbers the products and names the background image when her room is attached', () => {
+    const prompt = buildImagePrompt(
+      {
+        persona: aanya,
+        scene: { outfitState: 'wearing_product', showsProduct: true, description: 'Full-body front view by her bedroom curtain.' },
+        garmentParagraph: SAMPLE_GARMENT,
+        personCount: 2,
+        backgroundIndex: 5,
+      },
+      prompts,
+    );
+    expect(prompt).toMatch(/^Images 1 and 2 show Aanya\. Images 3 and 4 show a product: Lavender net/);
+    expect(prompt).toContain('by her bedroom curtain. Image 5 shows the room: set the photo in exactly this room');
+    expect(prompt).not.toMatch(/\{|\}|\[|\]|\s{2}/);
+  });
+
   it('picks the plain pattern when no product is shown', () => {
     expect(templateFor({ outfitState: 'own_clothes', showsProduct: false, description: '' })).toBe('templates/image-plain');
   });
@@ -69,6 +85,7 @@ describe('storyboard validation', () => {
     outfitState: 'own_clothes',
     showsProduct: true,
     setting: 'bedroom',
+    place: null,
     description: 'She holds it up.',
     productRoles: ['front'],
     onScreenText: 'Lavender net kurta set',
@@ -78,7 +95,7 @@ describe('storyboard validation', () => {
     motion: 'smiles',
     ...over,
   });
-  const constraints = { backKnown: false, pieceCount: 1, availableRoles: ['front', 'detail'], minTotalSec: 13, maxTotalSec: 17 };
+  const constraints = { backKnown: false, pieceCount: 1, availableRoles: ['front', 'detail'], minTotalSec: 13, maxTotalSec: 17, placeCount: 0 };
   const check = (scenes: StoryboardScene[]) => storyboardChecked(constraints).safeParse({ scenes, notes: [] });
 
   it('accepts a sensible storyboard', () => {

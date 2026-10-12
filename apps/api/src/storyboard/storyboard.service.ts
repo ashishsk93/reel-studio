@@ -14,6 +14,7 @@ import {
   SHOT_KINDS,
   sceneReviseChecked,
   storyboardChecked,
+  type BackgroundDto,
   type JobDto,
   type ProductImageRole,
   type ProductSpecDto,
@@ -63,6 +64,8 @@ interface BoardContext {
     defaultStyling: string;
   };
   references: RefCandidate[];
+  /** Her places: references tagged "background", numbered 1.. in this order for the storyboard. */
+  backgrounds: Array<RefCandidate & { note: string }>;
   products: ProductCandidate[];
   spec: ProductSpecDto;
   rules: RefRules;
@@ -124,6 +127,9 @@ export class StoryboardService implements OnModuleInit {
     const scenes = project.scenes.map((s) => this.toDto(s, ctx));
     return {
       scenes,
+      backgrounds: ctx.backgrounds.map(
+        (b, i): BackgroundDto => ({ id: b.id, number: i + 1, note: b.note, url: this.storage.url(b.path) ?? '' }),
+      ),
       notes: readJson(z.array(z.string()), project.storyboardNotes, []),
       totalSec: Math.round(scenes.reduce((sum, s) => sum + s.targetDurationSec, 0) * 10) / 10,
       ctaSec: ctx.ctaSec,
@@ -237,6 +243,8 @@ export class StoryboardService implements OnModuleInit {
             `- Product image roles available: ${constraints.availableRoles.join(', ')}`,
             `- Scene durations must add up to ${constraints.minTotalSec}–${constraints.maxTotalSec} s (a ${ctx.ctaSec} s CTA is added after).`,
             '',
+            this.placesBlock(ctx),
+            '',
             instruction ? `User instruction for this storyboard: ${instruction}` : 'Plan the storyboard.',
           ].join('\n'),
         },
@@ -244,7 +252,7 @@ export class StoryboardService implements OnModuleInit {
       projectId,
     });
 
-    const scenes = result.data.scenes;
+    const scenes = result.data.scenes.map((scene) => this.fromLlm(ctx, scene));
     const built = scenes.map((scene) => this.buildFromFields(ctx, scene));
     const replaced = await this.prisma.scene.findMany({ where: { projectId }, select: { id: true } });
     await this.prisma.$transaction(async (tx) => {
@@ -281,11 +289,13 @@ export class StoryboardService implements OnModuleInit {
             `- Back of the product known: ${constraints.backKnown ? 'yes' : 'no'}`,
             `- Product image roles available: ${constraints.availableRoles.join(', ')}`,
             '',
+            this.placesBlock(ctx),
+            '',
             '## The full storyboard (for consistency)',
             ...others.map((s) => `${s.order + 1}. ${s.type} · ${s.setting} · ${s.outfitState}: ${s.description}`),
             '',
             `## Scene ${scene.order + 1} to revise (JSON)`,
-            JSON.stringify(this.editable(scene), null, 2),
+            JSON.stringify(this.toLlm(ctx, this.editable(scene)), null, 2),
             '',
             instruction ? `Instruction: ${instruction}` : 'No instruction: improve the description as described.',
           ].join('\n'),
@@ -294,7 +304,7 @@ export class StoryboardService implements OnModuleInit {
       projectId: scene.projectId,
     });
 
-    const fields = result.data.scene;
+    const fields = this.fromLlm(ctx, result.data.scene);
     const built = this.buildFromFields(ctx, fields);
     await this.prisma.scene.update({
       where: { id: sceneId },
@@ -314,10 +324,12 @@ export class StoryboardService implements OnModuleInit {
       this.settings.get('compose.cta'),
     ]);
     const inf = project.influencer;
+    const references = inf.references.map((r) => ({ id: r.id, tags: refTags(r), path: r.path, sortOrder: r.sortOrder, note: r.note }));
     return {
       projectId,
       persona: { ...inf, ...personaOf(inf) },
-      references: inf.references.map((r) => ({ id: r.id, tags: refTags(r), path: r.path, sortOrder: r.sortOrder })),
+      references,
+      backgrounds: references.filter((r) => r.tags.includes('background')).sort((a, b) => a.sortOrder - b.sortOrder),
       products: project.productImages.map((p) => ({
         id: p.id,
         role: readJson(z.enum(PRODUCT_IMAGE_ROLES), p.role, 'other'),
@@ -338,7 +350,28 @@ export class StoryboardService implements OnModuleInit {
       availableRoles: [...new Set(ctx.products.map((p) => p.role))],
       minTotalSec: REEL_MIN_SEC - ctx.ctaSec,
       maxTotalSec: REEL_MAX_SEC - ctx.ctaSec,
+      placeCount: ctx.backgrounds.length,
     };
+  }
+
+  private placesBlock(ctx: BoardContext): string {
+    if (ctx.backgrounds.length === 0) return '## Her places\nNone yet: set `place` to null for every scene.';
+    return [
+      '## Her places (a photo of each is attached to the image prompt as the background)',
+      ...ctx.backgrounds.map((b, i) => `${i + 1}. ${b.note.trim() || 'Her room (no description)'}`),
+    ].join('\n');
+  }
+
+  /** The storyboard's numbered `place` becomes the background reference id. */
+  private fromLlm(ctx: BoardContext, scene: StoryboardScene): SceneEditable {
+    const { place, ...rest } = scene;
+    return { ...rest, backgroundId: place ? (ctx.backgrounds[place - 1]?.id ?? null) : null };
+  }
+
+  private toLlm(ctx: BoardContext, scene: SceneEditable): StoryboardScene {
+    const { backgroundId, ...rest } = scene;
+    const index = ctx.backgrounds.findIndex((b) => b.id === backgroundId);
+    return { ...rest, place: index >= 0 ? index + 1 : null };
   }
 
   private garmentText(ctx: BoardContext): string {
@@ -347,7 +380,8 @@ export class StoryboardService implements OnModuleInit {
   }
 
   /** Attachments + prompt for a scene's fields. Pure given the context. */
-  private buildFromFields(ctx: BoardContext, fields: SceneEditable | StoryboardScene): BuiltScene {
+  private buildFromFields(ctx: BoardContext, fields: SceneEditable): BuiltScene {
+    const background = fields.backgroundId ? (ctx.backgrounds.find((b) => b.id === fields.backgroundId) ?? null) : null;
     const selection = selectAttachments({
       influencerName: ctx.persona.name,
       shotKind: fields.shotKind,
@@ -358,11 +392,19 @@ export class StoryboardService implements OnModuleInit {
       products: ctx.products,
       rules: ctx.rules,
       maxRefs: ctx.maxRefs[fields.imageModel] ?? 4,
+      background,
     });
+    if (fields.backgroundId && !background) selection.missing.push('The background picked for this scene was removed; pick another or none.');
     let prompt: string;
     try {
       prompt = buildImagePrompt(
-        { persona: ctx.persona, scene: fields, garmentParagraph: ctx.spec.garmentParagraph, personCount: selection.personCount },
+        {
+          persona: ctx.persona,
+          scene: fields,
+          garmentParagraph: ctx.spec.garmentParagraph,
+          personCount: selection.personCount,
+          backgroundIndex: selection.backgroundIndex,
+        },
         this.prompts,
       );
     } catch (error) {
@@ -419,10 +461,11 @@ export class StoryboardService implements OnModuleInit {
       imageModel: readJson(z.enum(IMAGE_MODELS), scene.imageModel, 'nano_banana'),
       imageModelReason: scene.imageModelReason,
       motion: scene.motion,
+      backgroundId: scene.backgroundId,
     };
   }
 
-  private columns(fields: SceneEditable | StoryboardScene, built: BuiltScene) {
+  private columns(fields: SceneEditable, built: BuiltScene) {
     return {
       type: fields.type,
       purpose: fields.purpose,
@@ -437,6 +480,7 @@ export class StoryboardService implements OnModuleInit {
       imageModel: fields.imageModel,
       imageModelReason: fields.imageModelReason,
       motion: fields.motion,
+      backgroundId: fields.backgroundId,
       imagePrompt: built.prompt,
       attachments: toJson(built.attachments.map(({ kind, id, label, fileName }) => ({ kind, id, label, fileName }))),
     };

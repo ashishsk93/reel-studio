@@ -19,7 +19,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { JobDto, ProductImageRole, SceneDto } from "@reel/shared";
+import type { BackgroundDto, JobDto, ProductImageRole, SceneDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ import {
 import { EmptyState } from "@/components/page-header";
 import { PromptCard } from "@/components/prompt-card";
 import { JobBanner } from "@/components/projects/job-banner";
-import { MODEL_LABEL, SCENE_LABEL, SHOT_LABEL, SceneDialog, type SceneSubmit } from "@/components/projects/scene-dialog";
+import { BackgroundSelect, MODEL_LABEL, SCENE_LABEL, SHOT_LABEL, SceneDialog, type SceneSubmit } from "@/components/projects/scene-dialog";
 import { API_URL, ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useProject, useSpec, useStoryboard } from "@/lib/queries";
@@ -163,6 +163,7 @@ export default function StoryboardStep() {
                 scene={scene}
                 projectId={id}
                 availableRoles={roles}
+                backgrounds={board?.backgrounds ?? []}
                 isFirst={i === 0}
                 isLast={i === scenes.length - 1}
                 order={scenes.map((s) => s.id)}
@@ -176,6 +177,7 @@ export default function StoryboardStep() {
         open={adding}
         onOpenChange={setAdding}
         availableRoles={roles}
+        backgrounds={board?.backgrounds ?? []}
         errors={addErrors}
         saving={add.isPending}
         onSubmit={(v) => add.mutate(v)}
@@ -238,6 +240,7 @@ function SceneCard({
   scene,
   projectId,
   availableRoles,
+  backgrounds,
   isFirst,
   isLast,
   order,
@@ -245,6 +248,7 @@ function SceneCard({
   scene: SceneDto;
   projectId: string;
   availableRoles: ProductImageRole[];
+  backgrounds: BackgroundDto[];
   isFirst: boolean;
   isLast: boolean;
   order: string[];
@@ -341,6 +345,14 @@ function SceneCard({
             {scene.setting}
           </Badge>
         </div>
+        {backgrounds.length > 0 && (
+          <BackgroundSelect
+            className="h-8 text-xs"
+            value={scene.backgroundId}
+            backgrounds={backgrounds}
+            onChange={(v) => update.mutate({ backgroundId: v })}
+          />
+        )}
         {scene.motion && (
           <p className="text-xs text-muted-foreground">
             <span className="font-medium">Motion:</span> {scene.motion}
@@ -418,6 +430,7 @@ function SceneCard({
         onOpenChange={setEditing}
         scene={scene}
         availableRoles={availableRoles}
+        backgrounds={backgrounds}
         errors={errors}
         saving={update.isPending}
         onSubmit={(v) => update.mutate(v)}

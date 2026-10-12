@@ -6,7 +6,7 @@ import { framesArgs, normalizeArgs, parseProbe, probeArgs, sceneCutArgs, frameAt
 import { creditEstimate, planMultiShot, planSingle, shotLength, type PlanScene } from './plan';
 import { buildMultiShotPrompt, buildSinglePrompt, shotMarker } from './video-prompt';
 
-const options = { maxSec: 15, minSec: 3, paddingSec: 0.5, singleSec: 5 };
+const options = { maxSec: 15, minSec: 3, paddingSec: 0.5 };
 const scene = (order: number, setting: string, outfitState: string, targetDurationSec = 2.5): PlanScene => ({
   id: `s${order}`,
   order,
@@ -60,11 +60,12 @@ describe('video plan', () => {
     expect(jobs[1].durationSec).toBe(3);
   });
 
-  it('plans one 5 s generation per scene in single mode', () => {
+  it('plans one generation per scene in single mode, as long as the scene needs', () => {
     const jobs = planSingle(scenes, options);
     expect(jobs).toHaveLength(5);
-    expect(jobs[0].durationSec).toBe(5);
-    expect(jobs[0].expectedShots[0]).toMatchObject({ start: 0, end: 5, targetSec: 2.5 });
+    expect(jobs[0].durationSec).toBe(3); // 2.5 s + 0.5 s padding, Kling's 3 s minimum
+    expect(jobs[0].expectedShots[0]).toMatchObject({ start: 0, end: 3, targetSec: 2.5 });
+    expect(planSingle(scenes, { ...options, paddingSec: 1.5 })[0].durationSec).toBe(4);
   });
 
   it('estimates credits per 5 s', () => {
@@ -118,6 +119,13 @@ describe('cuts', () => {
     expect(suggestWindow({ start: 3, end: 6 }, 2.5)).toEqual({ inSec: 3.1, outSec: 5.6 });
     expect(suggestWindow({ start: 0, end: 2 }, 2.5)).toEqual({ inSec: 0.1, outSec: 1.7 });
     expect(suggestWindow({ start: 0, end: 5 }, 2.5, { usableFrom: 1, usableTo: 2.6 })).toEqual({ inSec: 1, outSec: 2.6 });
+  });
+
+  it("starts the window where the review's best moment is, kept inside the usable part", () => {
+    expect(suggestWindow({ start: 0, end: 5 }, 2.5, { bestFrom: 1.4 })).toEqual({ inSec: 1.4, outSec: 3.9 });
+    // Too late to fit 2.5 s before the tail: pulled back so the window still fits.
+    expect(suggestWindow({ start: 0, end: 5 }, 2.5, { bestFrom: 4 })).toEqual({ inSec: 2.2, outSec: 4.7 });
+    expect(suggestWindow({ start: 0, end: 5 }, 2.5, { bestFrom: 0.5, usableFrom: 1 })).toEqual({ inSec: 1, outSec: 3.5 });
   });
 
   it('plans review frames: midpoints, around cuts, ends, capped sampling', () => {
@@ -192,7 +200,7 @@ describe('video prompts', () => {
   it('builds the single-scene prompt', () => {
     const prompt = buildSinglePrompt({ name: 'Meera Nair', forbiddenFeatures: [], motion: 'she slowly lifts the kurta and smiles' }, new PromptService());
     expect(prompt).toBe(
-      "Static, locked-off camera. She slowly lifts the kurta and smiles. Meera's face and hair stay the same, and the outfit stays exactly the same in every frame: same colour, pattern, neckline, length and cut. Subtle, realistic motion only, photorealistic.",
+      "Static, locked-off camera. She slowly lifts the kurta and smiles. Meera's face and hair stay the same, and the outfit stays exactly the same in every frame: same colour, pattern, neckline, length and cut. She keeps the warm, happy expression from the start image throughout: no sighing, frowning, pouting, eye-rolling, talking or lip movement. Subtle, realistic motion only, photorealistic.",
     );
   });
 });

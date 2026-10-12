@@ -20,8 +20,6 @@ export interface PlanOptions {
   minSec: number;
   /** Generated beyond each scene's target, so the best window can be picked. */
   paddingSec: number;
-  /** Single-scene generations. */
-  singleSec: number;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -110,11 +108,11 @@ export function planMultiShot(scenes: PlanScene[], options: PlanOptions): Planne
   );
 }
 
-/** Single-scene mode: one image-to-video generation per scene. */
+/** Single-scene mode: one image-to-video generation per scene, from that scene's approved still. */
 export function planSingle(scenes: PlanScene[], options: PlanOptions): PlannedJob[] {
   return [...scenes]
     .sort((a, b) => a.order - b.order)
-    .map((scene) => job([scene], [shotLength(scene.targetDurationSec, options.paddingSec, options.maxSec)], options, options.singleSec));
+    .map((scene) => job([scene], [shotLength(scene.targetDurationSec, options.paddingSec, options.maxSec)], options));
 }
 
 export function creditEstimate(durationSec: number, creditsPer5s: number): number {

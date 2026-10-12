@@ -117,7 +117,7 @@ export class VideoService implements OnModuleInit {
   }
 
   planOptions(tools: SettingValue<'tools.video'>): PlanOptions {
-    return { maxSec: tools.maxMultiShotSec, minSec: tools.minSec, paddingSec: tools.shotPaddingSec, singleSec: tools.singleShotSec };
+    return { maxSec: tools.maxMultiShotSec, minSec: tools.minSec, paddingSec: tools.shotPaddingSec };
   }
 
   expectedShots(job: VideoJob): ExpectedShotDto[] {
@@ -148,28 +148,11 @@ export class VideoService implements OnModuleInit {
       missing.push(`Scene ${first.order + 1} has no approved image.`);
     }
 
-    // Element references: the other shots' approved images, then her anchor, then the product.
-    const refs: Array<Omit<StoredAttachment, 'index' | 'fileName'> & { name: string }> = [];
-    for (const scene of present.slice(1)) {
-      if (scene.approvedAsset) {
-        refs.push({ kind: 'asset', id: scene.approvedAsset.id, path: scene.approvedAsset.path, label: `Scene ${scene.order + 1} image`, name: `scene${pad2(scene.order + 1)}` });
-      }
-    }
-    if (ctx.anchor) {
-      const slug = slugify(ctx.persona.name.split(' ')[0]);
-      refs.push({ kind: 'reference', id: ctx.anchor.id, path: ctx.anchor.path, label: `${ctx.persona.name.split(' ')[0]} anchor`, name: `${slug}_anchor` });
-    }
-    if (ctx.productFront && present.some((s) => s.showsProduct || s.outfitState === 'wearing_product')) {
-      refs.push({ kind: 'product', id: ctx.productFront.id, path: ctx.productFront.path, label: `Product ${ctx.productFront.role}`, name: `product_${ctx.productFront.role}` });
-    }
-    const max = ctx.tools.maxElementRefs;
-    if (refs.length > max) notes.push(`Left out to stay within ${max} element references: ${refs.slice(max).map((r) => r.label).join(', ')}.`);
-    for (const r of refs.slice(0, max)) {
-      const index = attachments.length + 1;
-      attachments.push({ index, kind: r.kind, id: r.id, path: r.path, label: r.label, fileName: `${index}_${r.name}${ext(r.path)}` });
-    }
-    if (attachments.length > 1) {
-      notes.unshift(`In Kling: image 1 is the start frame; add images 2–${attachments.length} as element references.`);
+    // Kling 3.0 on Higgsfield takes a start frame (and optionally an end frame), no reference images.
+    if (present.length > 1) {
+      notes.push(
+        `Kling only sees the start frame: shots 2–${present.length} are generated from the prompt alone, so their approved stills aren't used. Single-scene mode starts every scene from its own still.`,
+      );
     }
 
     let prompt = job.prompt;

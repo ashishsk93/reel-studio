@@ -83,6 +83,8 @@ export const SceneEditableSchema = z.object({
   imageModel: z.enum(IMAGE_MODELS),
   imageModelReason: z.string().trim(),
   motion: z.string().trim(),
+  /** One of the influencer's background references (her room), attached so the setting stays the same. */
+  backgroundId: z.string().nullable().default(null),
 });
 export type SceneEditable = z.infer<typeof SceneEditableSchema>;
 

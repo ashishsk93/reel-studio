@@ -35,6 +35,7 @@ export const TAG_LABEL: Record<RefTag, string> = {
   profile: "profile",
   hands: "hands",
   lifestyle: "lifestyle",
+  background: "background (room)",
 };
 
 export function TagChips({

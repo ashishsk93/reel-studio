@@ -7,6 +7,7 @@ import {
   PRODUCT_IMAGE_ROLES,
   SCENE_TYPES,
   SHOT_KINDS,
+  type BackgroundDto,
   type ProductImageRole,
   type SceneDto,
   type SceneEditable,
@@ -56,7 +57,45 @@ export const BLANK_SCENE: SceneEditable = {
   imageModel: "nano_banana",
   imageModelReason: "",
   motion: "",
+  backgroundId: null,
 };
+
+const NO_BACKGROUND = "none";
+
+/** "1. Her cosy Delhi bedroom with a cream curtain…" */
+export function backgroundLabel(b: BackgroundDto): string {
+  const note = b.note.trim() || "Her room";
+  return `${b.number}. ${note.length > 48 ? `${note.slice(0, 47)}…` : note}`;
+}
+
+/** Picks one of her places (references tagged background) as the scene's background, or none. */
+export function BackgroundSelect({
+  value,
+  backgrounds,
+  onChange,
+  className,
+}: {
+  value: string | null;
+  backgrounds: BackgroundDto[];
+  onChange: (id: string | null) => void;
+  className?: string;
+}) {
+  const items = [{ value: NO_BACKGROUND, label: "No background image" }, ...backgrounds.map((b) => ({ value: b.id, label: backgroundLabel(b) }))];
+  return (
+    <Select value={value ?? NO_BACKGROUND} items={items} onValueChange={(v) => v && onChange(v === NO_BACKGROUND ? null : String(v))}>
+      <SelectTrigger className={cn("w-full", className)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export type SceneSubmit = SceneEditable & { imagePrompt?: string; promptOverride?: boolean };
 
@@ -107,6 +146,7 @@ export function SceneDialog({
   onOpenChange,
   scene,
   availableRoles,
+  backgrounds,
   errors = {},
   saving,
   onSubmit,
@@ -115,6 +155,7 @@ export function SceneDialog({
   onOpenChange: (open: boolean) => void;
   scene?: SceneDto;
   availableRoles: ProductImageRole[];
+  backgrounds: BackgroundDto[];
   errors?: Record<string, string>;
   saving?: boolean;
   onSubmit: (value: SceneSubmit) => void;
@@ -171,6 +212,13 @@ export function SceneDialog({
           </Field>
           <Field label="Setting">
             <Input value={form.setting} onChange={(e) => set("setting", e.target.value)} />
+          </Field>
+          <Field
+            label="Background image"
+            hint={backgrounds.length ? "Her room photo, attached last so the room stays the same" : "Add a Background reference to her (Reference plan → Her room)"}
+            className="sm:col-span-3"
+          >
+            <BackgroundSelect value={form.backgroundId} backgrounds={backgrounds} onChange={(v) => set("backgroundId", v)} />
           </Field>
           <Field label="Scene description" hint="What she does, pose, framing, camera position, setting details." className="sm:col-span-3">
             <Textarea rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} disabled={override} />

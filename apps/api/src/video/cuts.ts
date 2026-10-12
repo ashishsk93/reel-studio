@@ -85,11 +85,14 @@ export interface WindowOptions {
   tailSec?: number;
   usableFrom?: number | null;
   usableTo?: number | null;
+  /** Where the video review says the best window starts. */
+  bestFrom?: number | null;
 }
 
 /**
- * The window of a shot used in the Reel: `targetSec` long, starting as early as possible
- * inside the clean part of the shot, never in its last ~0.3 s. Shorter shots give what they have.
+ * The window of a shot used in the Reel: `targetSec` long, inside the clean part of the shot and
+ * never in its last ~0.3 s, starting where the review says the best moment is (else as early as
+ * possible). Shorter shots give what they have.
  */
 export function suggestWindow(bound: { start: number; end: number }, targetSec: number, options: WindowOptions = {}): { inSec: number; outSec: number } {
   const lead = options.leadSec ?? 0.1;
@@ -103,6 +106,9 @@ export function suggestWindow(bound: { start: number; end: number }, targetSec: 
   if (hi - lo < 0.5) {
     lo = bound.start;
     hi = bound.end;
+  }
+  if (options.bestFrom !== null && options.bestFrom !== undefined) {
+    lo = Math.min(Math.max(lo, options.bestFrom), Math.max(lo, hi - targetSec));
   }
   const inSec = snap(lo);
   const outSec = snap(Math.min(hi, lo + targetSec));

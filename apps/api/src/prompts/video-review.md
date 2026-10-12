@@ -13,6 +13,8 @@ You get frames from the video, each labelled with its time and shot, plus the ap
 - `notes`: one or two sentences covering identity (face, hair, signature details), garment (colour, pattern, embroidery density, neckline, length versus the product and the approved still), motion (realistic, low, no flicker) and anatomy.
 - `issues`: concrete problems with severity (`critical`, `major`, `minor`) and the video times where they start and end (null if throughout).
 - `usableFrom` / `usableTo`: the clean part of the shot in video seconds. Use null when the whole shot is clean on that side. If the face or garment starts drifting at 4.2 s, set `usableTo` to the last clean frame time before it.
+- `bestFrom`: where the best window of the shot's target length starts (the target is listed per shot), inside the usable part. Pick the stretch a viewer should see: her expression warm and engaged (eyes open, smiling, not mid-blink, sighing or talking), the motion natural and already under way, the garment or product clearest and not blurred by movement, no frozen or morphing frames. Null means the start of the usable part. Say in `notes` why, in a few words.
+- Expression: a sigh, frown, pout, eye-roll, talking or lip movement, or a blank or tired look is a `major` issue with its times; keep it outside the usable window.
 
 Shot boundaries come from cut detection and may be off by a few frames; judge each frame by its own content.
 

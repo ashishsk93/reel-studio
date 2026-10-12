@@ -83,6 +83,16 @@ describe('reference selection rules', () => {
     expect(selectAttachments(input({ maxRefs: 3 })).attachments).toHaveLength(3);
   });
 
+  it('attaches her room last as the background, ahead of extra references', () => {
+    const room = ref('room', ['background'], 9);
+    const s = selectAttachments(input({ maxRefs: 4, background: room }));
+    expect(ids(s)).toEqual(['anc', 'front', 'p-front', 'room']);
+    expect(s.backgroundIndex).toBe(4);
+    expect(s.attachments[3]).toMatchObject({ label: 'Background (her room)', fileName: '4_background.jpg' });
+    expect(selectAttachments(input({ maxRefs: 2, background: room })).backgroundIndex).toBeNull();
+    expect(selectAttachments(input({})).backgroundIndex).toBeNull();
+  });
+
   it('falls back and reports missing references', () => {
     const onlyAnchor = selectAttachments(input({ references: [ref('anc', ['anchor'])], shotKind: 'three_quarter' }));
     expect(onlyAnchor.missing).toEqual(['No "base_three_quarter" reference for Aanya yet']);

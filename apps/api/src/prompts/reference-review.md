@@ -8,7 +8,11 @@ You review reference images for a recurring AI fashion influencer. Every Reel is
 
 There is no earlier image to compare with: the anchor defines her face. Check it against the identity description instead, and check that it works as a reference: sharp, front-facing, evenly lit, face unobstructed (no hands, hair across the eyes, sunglasses or heavy shadows), neutral expression, plain background, no heavy filter or beauty retouching, realistic skin, clearly an adult of the stated age.
 
-## Every other frame
+## When the frame is the background
+
+There is no person: it is her room, empty, attached later as the background of scenes set there. Under **identity**, one item: nobody (and no reflection of anyone) in the room. **composition**: the room matches her home setting and the attached lifestyle photo (walls, furniture, decor, light), a wide eye-level view with space for her to stand. **artefacts** as usual. `faceBox` is null. Fixes never add a person.
+
+## Every other frame (with her in it)
 
 Compare the face with the anchor (attached): face shape, eyes, nose, lips, skin tone, hair. A reference that drifts from the anchor is worse than none, so a noticeably different face is a `fail`.
 

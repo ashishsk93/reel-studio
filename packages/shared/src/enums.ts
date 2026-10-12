@@ -11,6 +11,7 @@ export const REF_TAGS = [
   'profile',
   'hands',
   'lifestyle',
+  'background',
 ] as const;
 export type RefTag = (typeof REF_TAGS)[number];
 
@@ -85,6 +86,7 @@ export const LLM_TASKS = [
   'assistant',
   'detail_regions',
   'placement_check',
+  'scene_text',
   'cover_pick',
   'captions',
 ] as const;

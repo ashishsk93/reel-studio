@@ -190,6 +190,23 @@ export const FRAMES: FrameDef[] = [
     outfit: 'home',
     background: 'home',
   },
+  {
+    tag: 'background',
+    purpose: 'Her room with nobody in it; attached to every scene set there so the room stays the same in every Reel.',
+    attach: ['lifestyle'],
+    imageModel: 'nano_banana',
+    modelReason: 'Keeps the room identical to the lifestyle photo.',
+    aspect: '9:16',
+    tips: [
+      'Check nothing of her is left in the room (no clothes on the bed, no reflections).',
+      'Its note (on the reference) is the room description the storyboard uses: edit it if the room differs.',
+      'For another place (a balcony, a living room), upload a photo on the References tab and tag it Background.',
+    ],
+    framing: () =>
+      'Wide view at standing eye level, as if a friend is about to photograph someone there, with clear space in the middle of the frame and the bed edge visible.',
+    outfit: 'home',
+    background: 'home',
+  },
 ];
 
 export function frameFor(tag: string): FrameDef | undefined {
@@ -266,6 +283,19 @@ export function buildFramePrompt(frame: FrameDef, persona: CreatorPersona, attac
     aspect: frame.aspect,
     intro: attachCount > 0 ? `${personImagesLead(attachCount)} ${first}.` : '',
   };
+  if (frame.tag === 'background') {
+    const room = tidyPrompt(
+      prompts.render('templates/creator-background', {
+        intro: attachCount > 0 ? `${personImagesLead(attachCount)} ${first} in her room.` : '',
+        homeSetting: homeSetting || 'her softly lit bedroom',
+        same: attachCount > 0 ? ' It is exactly the same room as in the image: same walls, furniture, decor and light, with her removed.' : '',
+        framing: sentence(frame.framing(first)),
+        aspect: frame.aspect,
+      }),
+    );
+    if (hasPlaceholder(room)) throw new CreatorPromptError('The frame prompt contains brackets or a placeholder; check the home setting.');
+    return room;
+  }
   const prompt = tidyPrompt(prompts.render(frame.tag === 'anchor' ? 'templates/creator-anchor' : 'templates/creator-frame', vars));
   if (hasPlaceholder(prompt)) throw new CreatorPromptError('The frame prompt contains brackets or a placeholder; check the persona text.');
   return prompt;
@@ -274,6 +304,7 @@ export function buildFramePrompt(frame: FrameDef, persona: CreatorPersona, attac
 /** Sentences a rewrite must keep verbatim (identity, persona rules, numbering). */
 export function requiredSentences(persona: CreatorPersona, frame: FrameDef, attachCount: number): string[] {
   const first = persona.name.split(' ')[0] || persona.name;
+  if (frame.tag === 'background') return attachCount > 0 ? [`${personImagesLead(attachCount)} ${first} in her room.`] : [];
   const required = [personaRules(persona)];
   if (frame.tag === 'anchor') required.push(sentence(persona.identityBlock));
   else required.push(sentence(persona.shortIdentity));

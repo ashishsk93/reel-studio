@@ -116,7 +116,7 @@ model Project {
   occasion          String
   status            String    @default("draft")
   furthestStatus    String    @default("draft")
-  videoMode         String    @default("multi_shot") // multi_shot | single
+  videoMode         String    @default("multi_shot") // multi_shot | single (new projects are created as single)
   storyboardNotes   Json? // string[] from the last storyboard generation
   postedAt          DateTime?
   createdAt         DateTime  @default(now())
@@ -185,6 +185,7 @@ model Scene {
   imageModelReason  String
   attachments       Json // AttachmentRef[]
   motion            String
+  backgroundId      String? // ReferenceImage tagged "background" attached as the setting
   approvedAssetId   String?  @unique
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

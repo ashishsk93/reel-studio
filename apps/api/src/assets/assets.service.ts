@@ -148,7 +148,7 @@ export class AssetsService {
       ]);
       await this.checkAllApproved(asset.projectId!);
     } else if (asset.creatorTaskId) {
-      const task = await this.prisma.creatorTask.findUniqueOrThrow({ where: { id: asset.creatorTaskId } });
+      const task = await this.prisma.creatorTask.findUniqueOrThrow({ where: { id: asset.creatorTaskId }, include: { influencer: true } });
       const tag = readJson(z.enum(REF_TAGS), task.tag, 'lifestyle');
       await this.influencers.promoteToReference({
         influencerId: task.influencerId,
@@ -157,7 +157,8 @@ export class AssetsService {
         height: asset.height,
         tag,
         creatorTaskId: task.id,
-        note: `Character creator, version ${asset.version}`,
+        // A background's note is the room description the storyboard picks places by.
+        note: tag === 'background' ? task.influencer.homeSetting : `Character creator, version ${asset.version}`,
       });
       await this.prisma.$transaction([
         this.prisma.asset.updateMany({

@@ -82,6 +82,8 @@ export class CreatorService implements OnModuleInit {
   async list(influencerId: string): Promise<CreatorTaskDto[]> {
     const inf = await this.influencer(influencerId);
     const tasks = await this.prisma.creatorTask.findMany({ where: { influencerId }, orderBy: { order: 'asc' } });
+    // Frames added to the plan later (e.g. "background") join existing plans.
+    if (tasks.length > 0 && FRAMES.some((f) => !tasks.some((t) => t.tag === f.tag))) return this.plan(influencerId);
     return Promise.all(tasks.map((t) => this.toDto(t, inf)));
   }
 

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   captionsChecked,
   coverPickChecked,
+  sceneTextChecked,
   type CaptionPackageDto,
   type CaptionsUpdate,
   type CoverDto,
@@ -27,7 +28,9 @@ import { ComposeService, drawCover } from './compose.service';
 
 export const COVER_JOB = 'cover.suggest';
 export const CAPTIONS_JOB = 'captions.generate';
+export const SCENE_TEXT_JOB = 'segment.text';
 const ProjectPayload = z.object({ projectId: z.string() });
+const SceneTextPayload = z.object({ segmentId: z.string(), instruction: z.string().optional() });
 
 const CoverSchema = z.object({
   candidates: z.array(z.object({ segmentId: z.string(), assetId: z.string(), timeSec: z.number(), label: z.string() })).default([]),
@@ -102,6 +105,65 @@ export class CoverCaptionsService implements OnModuleInit {
         return { projectId };
       },
     });
+    this.jobs.register({
+      type: SCENE_TEXT_JOB,
+      group: 'llm',
+      payload: SceneTextPayload,
+      run: async ({ segmentId, instruction }, ctx) => {
+        await ctx.progress(0.1, 'Writing on-screen text options');
+        return this.sceneText(segmentId, instruction);
+      },
+    });
+  }
+
+  // ---------- on-screen text options ----------
+
+  async startSceneText(segmentId: string, instruction?: string) {
+    const s = await this.compose.findSegment(segmentId);
+    return this.jobs.enqueue(SCENE_TEXT_JOB, { segmentId, instruction }, { projectId: s.projectId });
+  }
+
+  /** Three new on-screen texts for one segment; the user picks one (nothing is saved here). */
+  private async sceneText(segmentId: string, instruction?: string): Promise<{ segmentId: string; options: string[] }> {
+    const s = await this.compose.findSegment(segmentId);
+    const project = await this.projects.find(s.projectId);
+    const spec = await this.product.get(s.projectId);
+    const inf = project.influencer;
+    const persona = personaOf(inf);
+    const others = (await this.compose.segments(s.projectId)).filter((o) => o.id !== s.id);
+    const frame = await this.videos.frameFull(s.assetId, (s.inSec + s.outSec) / 2);
+
+    const result = await this.llm.call({
+      task: 'scene_text',
+      schema: sceneTextChecked([s.onScreenText, ...others.map((o) => o.onScreenText)]),
+      system: [
+        this.prompts.render('scene-text', { copyRules: this.prompts.render('rules/copy-rules') }),
+        [personaBlock(inf), `Voice: ${inf.voiceNotes}`, `Personality: ${inf.personality}`, `Example lines: ${persona.exampleLines.map((l) => `"${l}"`).join(' / ')}`].join('\n'),
+        ...(spec ? [productBlock(spec)] : []),
+      ],
+      content: [
+        {
+          type: 'text',
+          text: [
+            `Product title: ${project.productTitle}`,
+            `Occasion: ${project.occasion}`,
+            '',
+            `## Scene ${s.scene.order + 1} (${s.scene.type})`,
+            `Purpose: ${s.scene.purpose}`,
+            `What happens: ${s.scene.description}`,
+            `Current text: "${s.onScreenText}"`,
+            '',
+            'Texts the other scenes use:',
+            ...others.map((o) => `- Scene ${o.scene.order + 1} (${o.scene.type}): "${o.onScreenText}"`),
+          ].join('\n'),
+        },
+        { type: 'image', path: frame, label: 'A frame from this scene:' },
+        { type: 'text', text: instruction ? `Instruction: ${instruction}` : 'Write 3 options.' },
+      ],
+      projectId: s.projectId,
+      influencerId: inf.id,
+    });
+    return { segmentId, options: result.data.options.map((o) => o.trim()) };
   }
 
   // ---------- cover ----------

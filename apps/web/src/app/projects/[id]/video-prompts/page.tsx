@@ -16,8 +16,8 @@ import { projectKeys, useImagesStep, useVideoStep } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 const MODES: Array<{ value: VideoMode; label: string; hint: string }> = [
-  { value: "multi_shot", label: "Multi-shot", hint: "Scenes sharing a setting and outfit in one Kling run of up to 15 s (saves credits)" },
-  { value: "single", label: "Single scene", hint: "One 5 s image-to-video generation per scene" },
+  { value: "single", label: "Single scene", hint: "One generation per scene, each from its own approved still (recommended: Kling only takes a start frame)" },
+  { value: "multi_shot", label: "Multi-shot", hint: "Scenes sharing a setting and outfit in one run of up to 15 s; shots after the first are generated from the prompt alone" },
 ];
 
 export default function VideoPromptsPage() {

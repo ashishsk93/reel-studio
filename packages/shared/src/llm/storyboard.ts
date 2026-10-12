@@ -9,6 +9,11 @@ export const StoryboardSceneSchema = z.object({
   outfitState: z.enum(OUTFIT_STATES).describe('own_clothes = her home outfit; wearing_product = dressed in the product'),
   showsProduct: z.boolean(),
   setting: z.string().describe('Where, consistent across scenes that share a location'),
+  place: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Number of her place (from the list of her places) this scene is set in, or null if none fits; its photo is attached as the background"),
   description: z
     .string()
     .describe(
@@ -21,7 +26,9 @@ export const StoryboardSceneSchema = z.object({
   targetDurationSec: z.number(),
   imageModel: z.enum(IMAGE_MODELS),
   imageModelReason: z.string().describe('One line'),
-  motion: z.string().describe('Subtle motion for the later video step, e.g. "she slowly lifts the kurta and smiles"'),
+  motion: z
+    .string()
+    .describe('Subtle motion and her expression for the later video step, e.g. "she slowly lifts the kurta, smiling softly at the camera"'),
 });
 export type StoryboardScene = z.infer<typeof StoryboardSceneSchema>;
 
@@ -38,9 +45,11 @@ export interface StoryboardConstraints {
   /** Total for the main scenes, excluding the CTA. */
   minTotalSec: number;
   maxTotalSec: number;
+  /** How many background places the influencer has (scene.place is 1..placeCount or null). */
+  placeCount: number;
 }
 
-function wordCount(text: string): number {
+export function wordCount(text: string): number {
   return text
     .replace(/\p{Extended_Pictographic}/gu, ' ')
     .split(/\s+/)
@@ -57,6 +66,9 @@ export function sceneIssues(scene: StoryboardScene, c: StoryboardConstraints): s
   const unknownRoles = scene.productRoles.filter((r) => !c.availableRoles.includes(r));
   if (unknownRoles.length) issues.push(`productRoles not uploaded: ${unknownRoles.join(', ')}`);
   if (scene.targetDurationSec < 1 || scene.targetDurationSec > 5) issues.push('targetDurationSec must be 1-5');
+  if (scene.place !== null && (scene.place < 1 || scene.place > c.placeCount)) {
+    issues.push(c.placeCount ? `place must be 1-${c.placeCount} or null` : 'place must be null: she has no places yet');
+  }
   return issues;
 }
 

@@ -50,27 +50,23 @@ export const SETTINGS = {
     label: 'Video tool (Kling 3.0 on Higgsfield)',
     schema: z.object({
       label: z.string(),
-      maxElementRefs: z.number().int().min(0),
       maxMultiShotSec: z.number().positive(),
-      singleShotSec: z.number().positive(),
       resolution: z.string(),
       sound: z.boolean(),
       creditsPer5s: z.number().nonnegative(),
       /** Shortest generation Kling accepts. */
       minSec: z.number().positive().default(3),
       /** Extra seconds generated per shot beyond the scene's target, so there is room to trim. */
-      shotPaddingSec: z.number().min(0).max(3).default(0.5),
+      shotPaddingSec: z.number().min(0).max(3).default(1.5),
     }),
     default: {
       label: 'Kling 3.0',
-      maxElementRefs: 4,
       maxMultiShotSec: 15,
-      singleShotSec: 5,
       resolution: '720p',
       sound: false,
       creditsPer5s: 6.25,
       minSec: 3,
-      shotPaddingSec: 0.5,
+      shotPaddingSec: 1.5,
     },
   },
   'storyboard.refRules': {
@@ -109,7 +105,7 @@ export const SETTINGS = {
       shotLine: 'Shot {{index}} ({{start}}–{{end}}s): {{description}} {{motion}}',
       cutMarker: 'Hard cut.',
       footer:
-        "Static, locked-off camera in every shot. {{name}}'s face and hair stay identical across all shots{{forbiddenReminder}}. The outfit stays exactly the same in every frame: same colour, pattern, neckline, length and cut. Subtle, realistic motion only, photorealistic, no text, no captions.",
+        "Static, locked-off camera in every shot. {{name}}'s face and hair stay identical across all shots{{forbiddenReminder}}. She keeps the warm, happy expression from the start image throughout: no sighing, frowning, pouting, eye-rolling, talking or lip movement. The outfit stays exactly the same in every frame: same colour, pattern, neckline, length and cut. Subtle, realistic motion only, photorealistic, no text, no captions.",
     },
   },
   'media.sceneThreshold': {

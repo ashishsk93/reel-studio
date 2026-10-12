@@ -119,6 +119,7 @@ export class AssistantService implements OnModuleInit {
             plan: result.data.edit,
             candidates: ctx.candidates,
             maxRefs: ctx.maxRefs[result.data.edit.tool],
+            noPerson: ctx.frame?.tag === 'background',
           },
           this.prompts,
         );

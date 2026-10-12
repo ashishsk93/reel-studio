@@ -53,7 +53,10 @@ export class ProjectsService {
       const infos = await Promise.all(files.map((f) => inspectImage(f.path, f.originalname)));
 
       const { roles, ...projectData } = data;
-      const project = await this.prisma.project.create({ data: { ...projectData, priceModeOverride: data.priceModeOverride ?? null } });
+      // Single-scene videos by default: Kling 3.0 only takes a start frame, so every scene starts from its own still.
+      const project = await this.prisma.project.create({
+        data: { ...projectData, videoMode: 'single', priceModeOverride: data.priceModeOverride ?? null },
+      });
       await this.saveImages(project.id, files, infos, roles, 0);
       return this.get(project.id);
     } finally {

@@ -86,6 +86,8 @@ export function buildEditPrompt(
     plan: EditPlan;
     candidates: EditCandidate[];
     maxRefs: number;
+    /** An empty-room background reference: no identity rules. */
+    noPerson?: boolean;
   },
   prompts: PromptService,
 ): StoredEditPrompt {
@@ -123,7 +125,7 @@ export function buildEditPrompt(
     .join(' ');
 
   const prompt = tidyPrompt(
-    prompts.render('templates/image-edit', {
+    prompts.render(input.noPerson ? 'templates/image-edit-room' : 'templates/image-edit', {
       intro,
       instruction: sentence(plan.instruction),
       keep: sentence(plan.keep),

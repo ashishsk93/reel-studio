@@ -124,7 +124,7 @@ export class ReviewService implements OnModuleInit {
       try {
         fixes.push(
           buildEditPrompt(
-            { persona: ctx.persona, edited: { id: asset.id, path: asset.path }, plan, candidates: ctx.candidates, maxRefs: ctx.maxRefs[plan.tool] },
+            { persona: ctx.persona, edited: { id: asset.id, path: asset.path }, plan, candidates: ctx.candidates, maxRefs: ctx.maxRefs[plan.tool], noPerson: ctx.frame?.tag === 'background' },
             this.prompts,
           ),
         );

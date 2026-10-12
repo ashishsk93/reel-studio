@@ -9,6 +9,7 @@ const shot = (n: number, verdict: 'pass' | 'warn' | 'fail' = 'pass') => ({
   issues: [],
   usableFrom: null,
   usableTo: null,
+  bestFrom: null,
 });
 
 const base: VideoReviewOutput = { verdict: 'pass', summary: 'Clean.', shots: [shot(1), shot(2)], fixes: [] };

@@ -153,14 +153,25 @@ export interface SceneDto {
   imageModel: ImageModel;
   imageModelReason: string;
   motion: string;
+  backgroundId: string | null;
   imagePrompt: string;
   promptOverride: boolean;
   card: PromptCardDto;
   updatedAt: string;
 }
 
+/** One of the influencer's places (a reference tagged "background"), offered as a scene's background. */
+export interface BackgroundDto {
+  id: string;
+  /** 1-based number the storyboard uses. */
+  number: number;
+  note: string;
+  url: string;
+}
+
 export interface StoryboardDto {
   scenes: SceneDto[];
+  backgrounds: BackgroundDto[];
   notes: string[];
   totalSec: number;
   ctaSec: number;
@@ -373,6 +384,8 @@ export interface VideoShotReviewDto {
   issues: Array<{ severity: IssueSeverity; description: string; fromSec: number | null; toSec: number | null }>;
   usableFrom: number | null;
   usableTo: number | null;
+  /** Start of the best window Claude picked, or null (older reviews). */
+  bestFrom?: number | null;
   suggestedIn: number;
   suggestedOut: number;
 }

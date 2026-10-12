@@ -6,6 +6,7 @@ import {
   CaptionsUpdateSchema,
   CoverChooseSchema,
   CtaUpdateSchema,
+  InstructionSchema,
   SegmentComposeUpdateSchema,
   SegmentDetectionsSchema,
   type ComposeStepDto,
@@ -49,6 +50,12 @@ export class ComposeController {
   @Post('segments/:id/detail-regions')
   detailRegions(@Param('id') id: string) {
     return this.compose.startDetails(id);
+  }
+
+  /** Three new on-screen text options for this segment (job result: { options }). */
+  @Post('segments/:id/text/suggest')
+  suggestText(@Param('id') id: string, @Body(new ZodPipe(InstructionSchema)) body: z.output<typeof InstructionSchema>) {
+    return this.extras.startSceneText(id, body.instruction);
   }
 
   @Post('segments/:id/placement/check')

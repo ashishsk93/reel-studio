@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Loader2, RotateCcw, ScanFace, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, Loader2, RotateCcw, ScanFace, ShieldCheck, Sparkles, TriangleAlert, X } from "lucide-react";
 import { toast } from "sonner";
 import type { ComposeSegmentDto, ComposeStepDto, JobDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
@@ -221,6 +221,25 @@ function SegmentRow({
     onSuccess: setData,
     onError: (e) => toast.error(errorMessage(e)),
   });
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [options, setOptions] = useState<string[]>([]);
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const job = await api.post<JobDto>(`/segments/${s.id}/text/suggest`, { instruction: instruction.trim() || undefined });
+      const done = await watch(job, { label: `Writing text for scene ${s.sceneOrder + 1}`, successMessage: "Pick one of the new texts" });
+      const result = done.result as { options?: string[] } | null;
+      if (done.status === "succeeded") setOptions(result?.options ?? []);
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const choose = (option: string) => {
+    setText(option);
+    update.mutate({ onScreenText: option });
+    setOptions([]);
+    setSuggestOpen(false);
+    setInstruction("");
+  };
   const check = useMutation({
     mutationFn: async () => {
       const job = await api.post<JobDto>(`/segments/${s.id}/placement/check`);
@@ -259,7 +278,45 @@ function SegmentRow({
         className="font-display font-semibold"
         placeholder="No on-screen text"
       />
+      {suggestOpen ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed p-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <Input
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !suggest.isPending && suggest.mutate()}
+              placeholder="Optional: more playful, mention the colour…"
+              className="h-8 text-xs"
+            />
+            <Button size="sm" onClick={() => suggest.mutate()} disabled={suggest.isPending}>
+              {suggest.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />} {options.length ? "Again" : "Suggest"}
+            </Button>
+            <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={() => (setSuggestOpen(false), setOptions([]))}>
+              <X />
+            </Button>
+          </div>
+          {options.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {options.map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => choose(o)}
+                  className="rounded-full border bg-background px-3 py-1 font-display text-sm font-semibold transition-colors hover:border-primary hover:bg-primary/5"
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
+        {!suggestOpen && (
+          <Button size="xs" variant="ghost" onClick={() => setSuggestOpen(true)}>
+            <Sparkles /> New text
+          </Button>
+        )}
         <label className="flex items-center gap-2">
           <Switch checked={s.badgeEnabled} onCheckedChange={(v) => update.mutate({ badgeEnabled: v })} /> Logo and price badge
           {!s.badgeEligible && <span className="text-muted-foreground">(not a product scene)</span>}

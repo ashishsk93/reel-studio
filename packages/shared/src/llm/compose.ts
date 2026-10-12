@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BoxSchema, type Box } from './review.js';
 import { hasPlaceholder } from './product.js';
+import { wordCount } from './storyboard.js';
 
 /**
  * Copy rules shared by every generated text: the influencer never touched the product, so no
@@ -95,3 +96,32 @@ export const PlacementCheckOutputSchema = z.object({
   ok: z.boolean().describe('true if the badge covers none of: her face, the hands holding the product, the key garment detail'),
   note: z.string().describe('One sentence: what it covers, or "clear"'),
 });
+
+// ---------- On-screen text for one scene ----------
+
+export const SceneTextOutputSchema = z.object({
+  options: z.array(z.string()).describe('Exactly 3 fresh alternatives, 3-7 words each, in her voice; at most one emoji each'),
+});
+export type SceneTextOutput = z.infer<typeof SceneTextOutputSchema>;
+
+const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** `avoid`: the current text and the other scenes' texts, which the options must not repeat. */
+export function sceneTextChecked(avoid: string[]) {
+  const taken = new Set(avoid.map(norm).filter(Boolean));
+  return SceneTextOutputSchema.superRefine((out, ctx) => {
+    if (out.options.length !== 3) ctx.addIssue({ code: 'custom', path: ['options'], message: 'Give exactly 3 options' });
+    const seen = new Set<string>();
+    out.options.forEach((t, i) => {
+      const words = wordCount(t);
+      if (words < 2 || words > 8) ctx.addIssue({ code: 'custom', path: ['options', i], message: `3-7 words (got ${words})` });
+      if ((t.match(/\p{Extended_Pictographic}/gu) ?? []).length > 1) ctx.addIssue({ code: 'custom', path: ['options', i], message: 'At most one emoji' });
+      for (const message of copyRuleIssues(t)) ctx.addIssue({ code: 'custom', path: ['options', i], message });
+      if (hasPlaceholder(t)) ctx.addIssue({ code: 'custom', path: ['options', i], message: 'No placeholders' });
+      const n = norm(t);
+      if (taken.has(n)) ctx.addIssue({ code: 'custom', path: ['options', i], message: `"${t}" is already used in this Reel; write a new line` });
+      if (seen.has(n)) ctx.addIssue({ code: 'custom', path: ['options', i], message: 'The options must differ' });
+      seen.add(n);
+    });
+  });
+}
