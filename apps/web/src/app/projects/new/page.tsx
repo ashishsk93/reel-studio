@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
@@ -50,16 +50,12 @@ export default function NewProjectPage() {
   const [submitting, setSubmitting] = useState(false);
   const set = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
 
-  // Sensible defaults: first active influencer, Amazon.
-  useEffect(() => {
-    if (!form.influencerId && influencers.data?.length) {
-      const first = influencers.data.find((i) => i.status === "active") ?? influencers.data[0];
-      setForm((f) => ({ ...f, influencerId: first.id }));
-    }
-  }, [influencers.data, form.influencerId]);
-  useEffect(() => {
-    if (!form.sourceId && sources.data?.length) setForm((f) => ({ ...f, sourceId: sources.data![0].id }));
-  }, [sources.data, form.sourceId]);
+  // Sensible defaults once the lists load: first active influencer, the first source (Amazon).
+  if (!form.influencerId && influencers.data?.length) {
+    const first = influencers.data.find((i) => i.status === "active") ?? influencers.data[0];
+    setForm({ ...form, influencerId: first.id });
+  }
+  if (!form.sourceId && sources.data?.length) setForm({ ...form, sourceId: sources.data[0].id });
 
   const source = sources.data?.find((s) => s.id === form.sourceId);
 

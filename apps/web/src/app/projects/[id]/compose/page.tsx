@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { ReelPreview } from "@/components/compose/reel-preview";
 import { CaptionsPanel, CoverPanel, CtaPanel } from "@/components/compose/panels";
 import { SCENE_LABEL } from "@/components/projects/scene-dialog";
@@ -42,7 +42,7 @@ export default function ComposePage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending || !data) return <Skeleton className="h-96 rounded-xl" />;
   if (data.segments.length === 0) {
     return (

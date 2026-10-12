@@ -104,7 +104,7 @@ export class AssetsController {
   }
 
   /** prompt.txt plus the images renamed in attach order; files deleted since are noted in prompt.txt. */
-  private async sendEditZip(res: Response, name: string, edit: StoredEditPrompt): Promise<void> {
+  private async sendEditZip(res: Response, name: string, edit: Pick<StoredEditPrompt, 'prompt' | 'attachments'>): Promise<void> {
     const entries: ZipEntry[] = [];
     const gone: string[] = [];
     for (const a of edit.attachments) {

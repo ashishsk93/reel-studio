@@ -4,29 +4,47 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import type { AssetDto, AssistantMessageDto, JobDto } from "@reel/shared";
+import type { AssistantMessageDto, JobDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EditPromptCard } from "@/components/assets/review-card";
+import { VideoFixCard } from "@/components/video/video-review-card";
 import { api, errorMessage } from "@/lib/api";
 import { useJobWatcher } from "@/lib/jobs";
 import { assistantKeys, useAssistantMessages } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-const EXAMPLES = ["Make the embroidery denser on the sleeves", "Change the background to a rooftop at golden hour", "Fix her hands"];
+const EXAMPLES = {
+  image: ["Make the embroidery denser on the sleeves", "Change the background to a rooftop at golden hour", "Fix her hands"],
+  video: ["She sighs at the end, keep her smiling", "Make the twirl gentler", "The dupatta moves too much"],
+};
 
-/** Modification assistant: describe a change, get an edit prompt plus the images to attach. History is kept per image. */
+export interface AssistantTarget {
+  id: string;
+  version: number;
+  url: string;
+  kind: "image" | "video";
+  /** Review issues offered as starting points. */
+  issues: string[];
+  /** Video assets: the job whose prompt an "adjust prompt" change rewrites. */
+  jobId?: string;
+}
+
+/**
+ * Modification assistant: describe a change, get a paste-ready edit (images) or a replacement shot
+ * or prompt rewrite (videos). History is kept per asset.
+ */
 export function AssistantPanel({
   asset,
   open,
   onOpenChange,
   onEdited,
 }: {
-  asset: AssetDto;
+  asset: AssistantTarget;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdited?: () => void;
+  onEdited?: () => void | Promise<unknown>;
 }) {
   const queryClient = useQueryClient();
   const watch = useJobWatcher();
@@ -40,10 +58,8 @@ export function AssistantPanel({
   }, [messages.length, thinking, open]);
 
   // Suggestions from the latest review's issues, then generic examples.
-  const suggestions = [
-    ...(asset.review?.issues ?? []).slice(0, 3).map((i) => `Fix this: ${i.description}`),
-    ...EXAMPLES,
-  ].slice(0, 4);
+  const suggestions = [...asset.issues.slice(0, 3).map((i) => `Fix this: ${i}`), ...EXAMPLES[asset.kind]].slice(0, 4);
+  const video = asset.kind === "video";
 
   const send = async (message: string) => {
     const body = message.trim();
@@ -54,8 +70,8 @@ export function AssistantPanel({
     try {
       const { job } = await api.post<{ message: AssistantMessageDto; job: JobDto }>(`/assets/${asset.id}/assistant`, { message: body });
       await queryClient.invalidateQueries({ queryKey: key });
-      const done = await watch(job, { label: "Modification assistant", successMessage: "Edit ready" });
-      if (done.status === "succeeded") onEdited?.();
+      const done = await watch(job, { label: "Modification assistant", successMessage: video ? "Change ready" : "Edit ready" });
+      if (done.status === "succeeded") await onEdited?.();
     } catch (e) {
       toast.error(errorMessage(e));
       setText(body);
@@ -73,14 +89,20 @@ export function AssistantPanel({
             <Sparkles className="size-4 text-primary" /> Modify version {asset.version}
           </DialogTitle>
           <DialogDescription>
-            Describe a change. You get an edit prompt for Higgsfield, the images to attach in order, and what to check.
+            {video
+              ? "Describe a change. You get a replacement shot (a single-scene Kling prompt with its start frame) or a prompt rewrite, and what to check."
+              : "Describe a change. You get an edit prompt for Higgsfield, the images to attach in order, and what to check."}{" "}
             Everything you don&apos;t mention stays the same.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset.url} alt="" className="hidden aspect-[9/16] w-32 self-start rounded-lg border object-cover sm:block" />
+          {video ? (
+            <video src={asset.url} controls muted playsInline className="hidden aspect-[9/16] w-36 self-start rounded-lg border bg-black object-contain sm:block" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={asset.url} alt="" className="hidden aspect-[9/16] w-32 self-start rounded-lg border object-cover sm:block" />
+          )}
           <div className="flex min-h-64 flex-1 flex-col gap-3 overflow-y-auto pr-1">
             {isPending && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
             {!isPending && messages.length === 0 && !thinking && (
@@ -115,11 +137,16 @@ export function AssistantPanel({
                     <EditPromptCard edit={m.edit} />
                   </div>
                 )}
+                {m.videoFix && asset.jobId && (
+                  <div className="w-full">
+                    <VideoFixCard fix={m.videoFix} jobId={asset.jobId} onChanged={() => onEdited?.()} />
+                  </div>
+                )}
               </div>
             ))}
             {thinking && (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Writing the edit…
+                <Loader2 className="size-4 animate-spin" /> {video ? "Watching the frames…" : "Writing the edit…"}
               </p>
             )}
             <div ref={bottom} />
@@ -143,7 +170,7 @@ export function AssistantPanel({
                 void send(text);
               }
             }}
-            placeholder='e.g. "The embroidery looks too sparse on the sleeve" (Ctrl+Enter to send)'
+            placeholder={video ? 'e.g. "She sighs at the end" (Ctrl+Enter to send)' : 'e.g. "The embroidery looks too sparse on the sleeve" (Ctrl+Enter to send)'}
           />
           <Button type="submit" disabled={!text.trim() || thinking}>
             {thinking ? <Loader2 className="animate-spin" /> : <Send />} Send

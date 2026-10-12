@@ -278,7 +278,11 @@ function AssetDetail({
         generated={{ label: `Generated v${asset.version}`, url: asset.url }}
         images={compare}
       />
-      <AssistantPanel asset={asset} open={assistantOpen} onOpenChange={setAssistantOpen} />
+      <AssistantPanel
+        asset={{ id: asset.id, version: asset.version, url: asset.url, kind: "image", issues: (asset.review?.issues ?? []).map((i) => i.description) }}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import type {
   ProjectSummaryDto,
   SourceDto,
   StoryboardDto,
+  UsageSummaryDto,
 } from "@reel/shared";
 import { SETTINGS } from "@reel/shared";
 import { api } from "./api";
@@ -28,6 +29,15 @@ export const keys = {
   settings: ["settings"] as const,
   usage: ["usage"] as const,
 };
+
+export function useUsage(params: { from?: string; projectId?: string }) {
+  const qs = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => Boolean(e[1]))).toString();
+  return useQuery({
+    queryKey: [...keys.usage, params],
+    queryFn: () => api.get<UsageSummaryDto>(`/usage${qs ? `?${qs}` : ""}`),
+    refetchInterval: 30_000,
+  });
+}
 
 export function useInfluencers() {
   return useQuery({ queryKey: keys.influencers, queryFn: () => api.get<InfluencerDto[]>("/influencers") });

@@ -214,14 +214,14 @@ function Uploader({ influencerId, hasAnchor }: { influencerId: string; hasAnchor
 }
 
 function FilePreview({ file }: { file: File }) {
-  const [url, setUrl] = useState<string>();
+  const img = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file);
-    setUrl(objectUrl);
+    if (img.current) img.current.src = objectUrl;
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
   // eslint-disable-next-line @next/next/no-img-element
-  return url ? <img src={url} alt={file.name} className="h-24 w-16 rounded-md border object-cover" /> : null;
+  return <img ref={img} alt={file.name} className="h-24 w-16 rounded-md border object-cover" />;
 }
 
 function ReferenceCard({ reference, influencerId }: { reference: ReferenceImageDto; influencerId: string }) {

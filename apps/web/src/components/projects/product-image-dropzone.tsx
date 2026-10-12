@@ -48,14 +48,14 @@ export function RoleSelect({ value, onChange }: { value: ProductImageRole; onCha
 }
 
 function Preview({ file }: { file: File }) {
-  const [url, setUrl] = useState<string>();
+  const img = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file);
-    setUrl(objectUrl);
+    if (img.current) img.current.src = objectUrl;
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
   // eslint-disable-next-line @next/next/no-img-element
-  return url ? <img src={url} alt={file.name} className="size-full object-cover" /> : null;
+  return <img ref={img} alt={file.name} className="size-full object-cover" />;
 }
 
 /** Drag-and-drop product photos, each with a role tag. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader } from "@/components/page-header";
+import { ErrorState, PageHeader } from "@/components/page-header";
 import { api, errorMessage } from "@/lib/api";
 import { keys } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 interface SettingRow<K extends SettingKey = SettingKey> {
   key: K;
@@ -47,7 +48,7 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Prices, tool limits and the templates the prompts are built from." />
-      {error && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+      {error && <ErrorState error={error} />}
 
       <div className="flex flex-col gap-6">
         <Card title="Environment" description="Read from .env at startup. Edit .env and restart the API to change these.">
@@ -116,10 +117,8 @@ const PRICE_FIELDS: Array<keyof ModelPrice> = ["input", "output", "cacheWrite", 
 
 function PricesCard({ row, rate }: { row: SettingRow<"llm.prices">; rate: SettingRow<"llm.usdToInr"> }) {
   const save = useSaveSetting();
-  const [prices, setPrices] = useState(row.value);
-  const [inr, setInr] = useState(rate.value);
-  useEffect(() => setPrices(row.value), [row.value]);
-  useEffect(() => setInr(rate.value), [rate.value]);
+  const [prices, setPrices] = useSyncedState(row.value, () => row.value);
+  const [inr, setInr] = useSyncedState(rate.value, () => rate.value);
 
   return (
     <Card
@@ -177,10 +176,8 @@ function PricesCard({ row, rate }: { row: SettingRow<"llm.prices">; rate: Settin
 
 function ToolsCard({ image, video }: { image: SettingRow<"tools.image">; video: SettingRow<"tools.video"> }) {
   const save = useSaveSetting();
-  const [img, setImg] = useState(image.value);
-  const [vid, setVid] = useState(video.value);
-  useEffect(() => setImg(image.value), [image.value]);
-  useEffect(() => setVid(video.value), [video.value]);
+  const [img, setImg] = useSyncedState(image.value, () => image.value);
+  const [vid, setVid] = useSyncedState(video.value, () => video.value);
 
   const num = (label: string, value: number, onChange: (n: number) => void, step = 1) => (
     <div>
@@ -236,9 +233,8 @@ function ToolsCard({ image, video }: { image: SettingRow<"tools.image">; video: 
 function JsonSettingCard({ row }: { row: SettingRow }) {
   const queryClient = useQueryClient();
   const save = useSaveSetting();
-  const [text, setText] = useState(() => JSON.stringify(row.value, null, 2));
+  const [text, setText] = useSyncedState(row.value, () => JSON.stringify(row.value, null, 2));
   const [parseError, setParseError] = useState("");
-  useEffect(() => setText(JSON.stringify(row.value, null, 2)), [row.value]);
 
   const reset = useMutation({
     mutationFn: () => api.del(`/settings/${row.key}`),

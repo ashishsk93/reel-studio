@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { PromptCard } from "@/components/prompt-card";
 import { AssetWorkbench } from "@/components/assets/asset-workbench";
 import { MODEL_LABEL } from "@/components/projects/scene-dialog";
@@ -41,7 +41,7 @@ export function CreatorPlan({ influencer }: { influencer: InfluencerDetailDto })
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending) return <Skeleton className="h-96 rounded-xl" />;
   if (!tasks?.length) {
     return (

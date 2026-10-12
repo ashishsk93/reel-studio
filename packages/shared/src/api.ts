@@ -213,16 +213,30 @@ export interface UsageRow {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   costUsd: number;
+  /** Projects only: Kling credits of the uploaded video generations (estimated from each job's length). */
+  klingCredits?: number;
+  /** Projects only: false when the project was deleted. */
+  exists?: boolean;
 }
 
 export interface UsageSummaryDto {
   from: string | null;
   to: string | null;
+  projectId: string | null;
   usdToInr: number;
   total: UsageRow;
+  failedCalls: number;
+  /** Share of input tokens served from the prompt cache (0–1). */
+  cacheHitRate: number;
+  klingCredits: number;
+  /** Reels rendered in the range and their average Claude cost. */
+  reels: { count: number; avgCostUsd: number };
+  /** One entry per day of the range (at most the last 60 days), oldest first. */
+  byDay: Array<{ date: string; calls: number; costUsd: number }>;
   byMonth: UsageRow[];
   byProject: UsageRow[];
   byTask: UsageRow[];
+  byModel: UsageRow[];
   recent: Array<{
     id: string;
     task: LlmTask;
@@ -316,6 +330,8 @@ export interface AssistantMessageDto {
   role: 'user' | 'assistant';
   content: string;
   edit: EditPromptDto | null;
+  /** Video assets: the suggested change (a replacement shot or a prompt rewrite). */
+  videoFix: VideoFixDto | null;
   createdAt: string;
 }
 
@@ -401,6 +417,8 @@ export interface VideoFixDto {
   /** regenerate_shot: a single-scene Kling prompt with its start image. */
   card: PromptCardDto | null;
   zipUrl: string | null;
+  /** From the modification assistant: what to check in the new video. */
+  checkAfter?: string[];
 }
 
 export interface VideoReviewDto {

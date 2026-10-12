@@ -29,7 +29,7 @@ export function CopyButton({
   };
 
   return (
-    <Button type="button" size={size} variant={variant} onClick={copy}>
+    <Button type="button" size={size} variant={variant} onClick={copy} data-copy>
       {copied ? <Check /> : <Copy />}
       {copied ? "Copied" : label}
     </Button>

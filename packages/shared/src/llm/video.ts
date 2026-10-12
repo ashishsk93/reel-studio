@@ -86,6 +86,37 @@ export function videoReviewChecked(c: { shotCount: number; durationSec: number }
   });
 }
 
+// ---------- Modification assistant for videos ----------
+
+export const VideoAssistantOutputSchema = z.object({
+  reply: z.string().describe('1-3 short sentences: what the change does, or the answer to a question'),
+  fix: VideoFixSchema.nullable().describe('The change to make, or null when the user only asked a question'),
+  checkAfter: z.array(z.string()).describe('2-4 things to check in the new video; empty when there is no fix'),
+});
+export type VideoAssistantOutput = z.infer<typeof VideoAssistantOutputSchema>;
+
+export function videoAssistantChecked(shotCount: number) {
+  return VideoAssistantOutputSchema.superRefine((out, ctx) => {
+    const f = out.fix;
+    if (!f) return;
+    if (f.shot !== null && (f.shot < 1 || f.shot > shotCount)) {
+      ctx.addIssue({ code: 'custom', path: ['fix', 'shot'], message: `shot must be 1-${shotCount} or null` });
+    }
+    if (f.kind === 'regenerate_shot' && f.shot === null && shotCount > 1) {
+      ctx.addIssue({ code: 'custom', path: ['fix', 'shot'], message: 'regenerate_shot needs a shot number' });
+    }
+    if (f.kind === 'regenerate_shot' && !f.motion?.trim()) {
+      ctx.addIssue({ code: 'custom', path: ['fix', 'motion'], message: 'Give the new motion line for the regenerated shot' });
+    }
+    if (hasPlaceholder(`${f.instruction} ${f.motion ?? ''} ${out.reply}`)) {
+      ctx.addIssue({ code: 'custom', path: ['fix'], message: 'No brackets or placeholders' });
+    }
+    if (out.checkAfter.length < 1 || out.checkAfter.length > 4) {
+      ctx.addIssue({ code: 'custom', path: ['checkAfter'], message: 'Give 2-4 things to check' });
+    }
+  });
+}
+
 // ---------- Video prompt rewrite ----------
 
 export const VideoPromptOutputSchema = z.object({ prompt: z.string() });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImageUp, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader } from "@/components/page-header";
+import { ErrorState, PageHeader } from "@/components/page-header";
 import { ListEditor } from "@/components/list-editor";
 import { api, errorMessage } from "@/lib/api";
 import { keys, useSources } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 const MODE_LABEL: Record<PriceMode, string> = {
   exact: "Exact price",
@@ -36,7 +37,7 @@ export default function SourcesPage() {
         title="Sources & logos"
         description="The store logo and price badge appear on product-showing segments. Disclosure lines go into every caption and DM reply."
       />
-      {error && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+      {error && <ErrorState error={error} />}
       <div className="grid gap-6 lg:grid-cols-3">
         {isPending
           ? Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-[520px] rounded-xl" />)
@@ -49,8 +50,7 @@ export default function SourcesPage() {
 function SourceCard({ source }: { source: SourceDto }) {
   const queryClient = useQueryClient();
   const file = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState(() => pick(source));
-  useEffect(() => setForm(pick(source)), [source]);
+  const [form, setForm] = useSyncedState(source, () => pick(source));
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(source));
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.sources });
 

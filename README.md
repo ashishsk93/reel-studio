@@ -13,7 +13,7 @@ The brief is in [docs/reel_studio_claude_code_prompt.md](docs/reel_studio_claude
 | 3 | Image review, fix prompts, modification assistant, character-creator reference plan | ✅ |
 | 4 | Video prompts, cut detection, video review, timeline editor | ✅ |
 | 5 | Compose, badge placement, CTA, cover, captions, render, export | ✅ |
-| 6 | Polish | — |
+| 6 | Polish: usage dashboard, keyboard shortcuts, error states, video modification assistant, render integration test | ✅ |
 
 ## Setup
 
@@ -76,15 +76,19 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
 
    **Approve** one image per scene (approving another replaces it). When every scene is approved, step 5 unlocks.
 5. **Video prompts.** Pick a mode (you can switch any time; each mode keeps its own prompts and uploads):
-   - **Multi-shot** (default, saves credits): consecutive scenes in the same place and outfit state become one Kling 3.0 run of up to 15 s. Each run shows one prompt with `Shot N (a–bs): … Hard cut.` markers, the shot plan, the start image (the first scene's approved image) and element references (the other scenes' images, her anchor, the product), 720p, sound off, and a credit estimate. The prompt format is the editable template in **Settings → Kling multi-shot prompt template**.
-   - **Single scene**: one 5 s image-to-video prompt per scene.
+   - **Single scene** (default, recommended): one image-to-video prompt per scene, started from that scene's approved still, as long as the scene needs (minimum 3 s). Kling 3.0 on Higgsfield takes only a start frame (no reference images), so this keeps every scene on its own still.
+   - **Multi-shot**: consecutive scenes in the same place and outfit state become one run of up to 15 s with `Shot N (a–bs): … Hard cut.` markers (template in **Settings → Kling multi-shot prompt template**). Only the first still is used; later shots come from the prompt alone.
 
-   Each shot is generated a little longer than the scene needs (`shotPaddingSec`, default 0.5 s) so there is room to trim. **Rewrite with AI** changes a prompt and keeps the shot markers and consistency lines; **Edit** and **Reset to template** work as for images.
+   Every prompt locks her expression (no sighing, frowning or talking).
+
+   Each shot is generated a little longer than the scene needs (`shotPaddingSec`, default 1.5 s) so there is room to trim. **Rewrite with AI** changes a prompt and keeps the shot markers and consistency lines; **Edit** and **Reset to template** work as for images.
 6. **Videos.** Upload each Kling result under its run. The app:
    1. probes it, then makes a constant-30 fps H.264 copy (fixes variable frame rate, 24 fps and rotation);
    2. detects the cuts and matches them to the planned shots (strong cuts within 1 s, weaker changes within 0.5 s of the plan; dashed lines in the timeline mean no cut was found);
    3. extracts frames (each shot's middle, both sides of every cut, the first and last frame, plus 2 fps up to 24) and Claude reviews them shot by shot: identity drift, forbidden features, garment morphing, flicker, anatomy, and whether the shot matches its scene;
-   4. suggests a window per scene: the scene's duration, starting just after the cut, never in the last 0.3 s of a shot, and avoiding frames Claude marks as drifting.
+   4. picks a window per scene: Claude chooses where the best stretch starts (expression, natural motion, clearest garment), inside the clean part of the shot and never in its last 0.3 s.
+
+   **Modify** opens the modification assistant for the video: describe a change ("she sighs at the end") and get a replacement shot or a prompt rewrite.
 
    The **timeline editor** shows the player with frame stepping, the planned shots, the detected cuts and one pink window per scene. Drag a cut line to move a shot boundary, or a window and its edges to choose what goes in the Reel; the exact frame under the handle is pulled from the server. **Save timeline** keeps your edits (reviews no longer move them); **Reset to suggestion** puts the review's windows back.
 
@@ -102,6 +106,10 @@ Reference images are chosen by the rules in **Settings → Reference image selec
 
 Check the live API connection any time with `pnpm --filter @reel/api llm:check` (one tiny call per configured model).
 
+## Keyboard shortcuts
+
+`C` copies the prompt under the mouse (or the first on screen), `Z` downloads its attachments, `[` / `]` move between steps, `1`–`8` jump to a step, `?` lists them all.
+
 ## Adding an influencer
 
 **New character (AI):** go to Influencers → **New character** and fill in the brief: age, city, lane, vibe, voice, and any must-have or must-avoid features. Claude drafts the identity block, forbidden and conditional feature rules, and voice. Review and edit the draft and use **Rewrite with AI** for targeted changes. Then open the **Reference plan** tab:
@@ -109,7 +117,8 @@ Check the live API connection any time with `pnpm --filter @reel/api llm:check` 
 1. **Create reference plan** gives one Higgsfield prompt per frame: anchor, turnaround, base front / ¾ / walk / hair up, close-ups (front, left, right), profile, hands and lifestyle. Prompts are assembled from her persona, so identity and feature rules are always verbatim; **Rewrite with AI** or **Edit** changes one, **Reset to default** rebuilds it.
 2. Start with the **anchor** (text to image, nothing attached). Upload a few variations; Claude checks each against her description and as a reference (sharp, front-facing, unobstructed). **Approve** the best: it becomes her anchor.
 3. The other frames unlock and attach the anchor (and the turnaround, once approved) in order. Uploads are checked for consistency with the anchor; approving one adds it to her references with the right tag. Skip any frame you don't need.
-4. Click **Activate** (only the anchor is required).
+4. Generate **Her room** (an empty photo of her home setting): scenes set there attach it as the background so the room stays the same in every Reel. Other places can be uploaded under References with the `background` tag; the note is the room description the storyboard uses.
+5. Click **Activate** (only the anchor is required).
 
 Tags she already has (e.g. existing characters) start as approved, so the plan also fills gaps for Aanya and Meera.
 
@@ -135,7 +144,7 @@ data/           DATA_DIR (git-ignored): app.db, uploads, logs/
 
 ```bash
 pnpm dev          # shared (watch) + API (watch) + web
-pnpm test         # vitest in packages/shared and apps/api
+pnpm test         # vitest in packages/shared and apps/api (includes a real FFmpeg render of 3 bundled clips)
 pnpm typecheck
 pnpm build
 pnpm db:migrate   # prisma migrate dev

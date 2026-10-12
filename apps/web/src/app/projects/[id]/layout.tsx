@@ -8,13 +8,14 @@ import { STEPS, formatInr, type StepKey } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stepper } from "@/components/projects/stepper";
-import { errorMessage } from "@/lib/api";
-import { useProject } from "@/lib/queries";
+import { ErrorState } from "@/components/page-header";
+import { useProject, useUsage } from "@/lib/queries";
 
 export default function ProjectLayout({ children }: { children: ReactNode }) {
   const { id } = useParams<{ id: string }>();
   const segment = useSelectedLayoutSegment();
   const { data: project, error } = useProject(id);
+  const { data: usage } = useUsage({ projectId: id });
   const step = STEPS.find((s) => s.key === segment)?.key as StepKey | undefined;
 
   return (
@@ -22,7 +23,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
       <Link href="/projects" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Projects
       </Link>
-      {error && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+      {error && <ErrorState error={error} />}
       {project ? (
         <>
           <div className="mb-6 flex flex-wrap items-center gap-4">
@@ -37,6 +38,15 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
                 {project.priceLabel && project.priceMode !== "exact" && ` (badge: ${project.priceLabel})`} · {project.occasion}
               </p>
             </div>
+            {usage && (usage.total.calls > 0 || usage.klingCredits > 0) && (
+              <Link
+                href={`/usage?project=${id}`}
+                className="rounded-lg border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                title="Claude cost and estimated Kling credits for this Reel"
+              >
+                Claude ${usage.total.costUsd.toFixed(3)} · {Math.round(usage.klingCredits * 100) / 100} Kling credits
+              </Link>
+            )}
             {project.postedAt && <Badge>Posted {new Date(project.postedAt).toLocaleDateString()}</Badge>}
           </div>
           <Stepper projectId={id} furthest={project.furthestStatus} current={step} />

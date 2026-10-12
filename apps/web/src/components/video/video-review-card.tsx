@@ -1,14 +1,15 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Clapperboard, Download } from "lucide-react";
+import { Clapperboard, Download, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
-import type { VideoReviewDto } from "@reel/shared";
+import type { JobDto, VideoFixDto, VideoReviewDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PromptCard } from "@/components/prompt-card";
 import { VERDICT_STYLE, VerdictBadge } from "@/components/assets/review-card";
 import { api, errorMessage } from "@/lib/api";
+import { useJobWatcher } from "@/lib/jobs";
 import { cn } from "@/lib/utils";
 
 const SEVERITY: Record<string, string> = {
@@ -20,25 +21,17 @@ const SEVERITY: Record<string, string> = {
 /** Shot-by-shot video review: verdicts, timed issues (click to seek), and fixes. */
 export function VideoReviewCard({
   review,
+  jobId,
   sceneLabel,
   onSeek,
   onReplacementCreated,
 }: {
   review: VideoReviewDto;
+  jobId: string;
   sceneLabel: (sceneId: string) => string;
   onSeek: (t: number) => void;
   onReplacementCreated: () => void | Promise<unknown>;
 }) {
-  const replace = useMutation({
-    mutationFn: (fix: { sceneId: string; motion: string | null }) =>
-      api.post<{ jobId: string }>(`/scenes/${fix.sceneId}/replacement-video-job`, { motion: fix.motion ?? undefined }),
-    onSuccess: async () => {
-      toast.success("Replacement shot added: generate it, then upload it under its own tab");
-      await onReplacementCreated();
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border bg-card p-4">
@@ -86,50 +79,85 @@ export function VideoReviewCard({
       {review.fixes.length > 0 && (
         <section className="flex flex-col gap-3">
           <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Fixes</h4>
-          {review.fixes.map((fix, i) =>
-            fix.card ? (
-              <PromptCard
-                key={i}
-                compact
-                card={fix.card}
-                title={`${fix.shot ? `Shot ${fix.shot}: ` : ""}${fix.title}`}
-                chips={<Badge variant="secondary">Regenerate this shot alone</Badge>}
-                footer={
-                  <div className="flex w-full flex-col gap-2">
-                    <p className="text-xs text-muted-foreground">{fix.instruction}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {fix.zipUrl && (
-                        <Button size="sm" variant="outline" nativeButton={false} render={<a href={fix.zipUrl} />}>
-                          <Download /> Download attachments (zip)
-                        </Button>
-                      )}
-                      {fix.sceneId && (
-                        <Button
-                          size="sm"
-                          onClick={() => replace.mutate({ sceneId: fix.sceneId!, motion: fix.motion })}
-                          disabled={replace.isPending}
-                        >
-                          <Clapperboard /> Add as replacement shot
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                }
-              />
-            ) : (
-              <div key={i} className="rounded-xl border bg-card p-3 text-sm">
-                <p className="font-semibold">
-                  {fix.shot ? `Shot ${fix.shot}: ` : ""}
-                  {fix.title}
-                </p>
-                <p className="text-xs text-muted-foreground">{fix.instruction}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Use &ldquo;Rewrite with AI&rdquo; on the run&apos;s prompt with this instruction.</p>
-              </div>
-            ),
-          )}
+          {review.fixes.map((fix, i) => (
+            <VideoFixCard key={i} fix={fix} jobId={jobId} onChanged={onReplacementCreated} />
+          ))}
         </section>
       )}
     </div>
   );
 }
 
+
+/**
+ * A suggested video change (from a review or the modification assistant): a single-scene prompt
+ * to add as a replacement shot, or an instruction to rewrite the run's prompt.
+ */
+export function VideoFixCard({ fix, jobId, onChanged }: { fix: VideoFixDto; jobId: string; onChanged: () => void | Promise<unknown> }) {
+  const watch = useJobWatcher();
+  const replace = useMutation({
+    mutationFn: () => api.post<{ jobId: string }>(`/scenes/${fix.sceneId}/replacement-video-job`, { motion: fix.motion ?? undefined }),
+    onSuccess: async () => {
+      toast.success("Replacement shot added: generate it, then upload it under its own tab");
+      await onChanged();
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const rewrite = useMutation({
+    mutationFn: async () => {
+      const job = await api.post<JobDto>(`/video-jobs/${jobId}/regenerate-prompt`, { instruction: fix.instruction });
+      await watch(job, { label: "Rewriting the video prompt", successMessage: "Prompt rewritten: see Video prompts" });
+      await onChanged();
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const title = `${fix.shot ? `Shot ${fix.shot}: ` : ""}${fix.title}`;
+  const checks = fix.checkAfter?.length ? (
+    <ul className="list-disc pl-4 text-xs text-muted-foreground">
+      {fix.checkAfter.map((c) => (
+        <li key={c}>{c}</li>
+      ))}
+    </ul>
+  ) : null;
+
+  if (fix.card) {
+    return (
+      <PromptCard
+        compact
+        card={fix.card}
+        title={title}
+        chips={<Badge variant="secondary">Regenerate this shot alone</Badge>}
+        footer={
+          <div className="flex w-full flex-col gap-2">
+            <p className="text-xs text-muted-foreground">{fix.instruction}</p>
+            {checks}
+            <div className="flex flex-wrap gap-2">
+              {fix.zipUrl && (
+                <Button size="sm" variant="outline" nativeButton={false} render={<a href={fix.zipUrl} />}>
+                  <Download /> Download attachments (zip)
+                </Button>
+              )}
+              {fix.sceneId && (
+                <Button size="sm" onClick={() => replace.mutate()} disabled={replace.isPending}>
+                  <Clapperboard /> Add as replacement shot
+                </Button>
+              )}
+            </div>
+          </div>
+        }
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 text-sm">
+      <p className="font-semibold">{title}</p>
+      <p className="text-xs text-muted-foreground">{fix.instruction}</p>
+      {checks}
+      {fix.kind === "adjust_prompt" && (
+        <Button size="sm" variant="outline" className="self-start" onClick={() => rewrite.mutate()} disabled={rewrite.isPending}>
+          {rewrite.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />} Rewrite the prompt with this
+        </Button>
+      )}
+    </div>
+  );
+}

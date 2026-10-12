@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Loader2, Plus, RefreshCw, ScanSearch, Wand2, X } from "lucide-react";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { CopyButton } from "@/components/copy-button";
 import { ListEditor } from "@/components/list-editor";
 import { JobBanner } from "@/components/projects/job-banner";
@@ -20,6 +20,7 @@ import { SpecEditor } from "@/components/projects/spec-editor";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useProject, useSpec } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 const ANALYZE = "product.analyze";
 const PARAGRAPH = "product.paragraph";
@@ -31,20 +32,19 @@ function editable(s: ProductSpecDto): ProductSpecSave {
 export default function AnalysisStep() {
   const { id } = useParams<{ id: string }>();
   const { data: project } = useProject(id);
-  const { data: spec, isPending } = useSpec(id);
+  const { data: spec, isPending, error } = useSpec(id);
   const jobs = useProjectJobs(id);
   const running = jobs.active(ANALYZE);
   const lastFailed = jobs.latest(ANALYZE)?.status === "failed" ? jobs.latest(ANALYZE) : undefined;
 
+  if (error) return <ErrorState error={error} />;
   if (isPending || !project) return null;
 
   return (
     <div className="flex flex-col gap-5">
       {running && <JobBanner job={running} label="Claude is reading the product photos" />}
       {!running && lastFailed && !spec && (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          The last analysis failed: {lastFailed.error}
-        </p>
+        <ErrorState error={new Error(`The last analysis failed: ${lastFailed.error}`)} onRetry={null} />
       )}
       {!spec ? (
         !running && (
@@ -129,9 +129,8 @@ function SpecView({
   const queryClient = useQueryClient();
   const watch = useJobWatcher();
   const jobs = useProjectJobs(projectId);
-  const [draft, setDraft] = useState(() => editable(spec));
+  const [draft, setDraft] = useSyncedState(spec, () => editable(spec));
   const [paragraphInstruction, setParagraphInstruction] = useState("");
-  useEffect(() => setDraft(editable(spec)), [spec]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(editable(spec));
   const paragraphJob = jobs.active(PARAGRAPH);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,13 +37,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { PromptCard } from "@/components/prompt-card";
 import { JobBanner } from "@/components/projects/job-banner";
 import { BackgroundSelect, MODEL_LABEL, SCENE_LABEL, SHOT_LABEL, SceneDialog, type SceneSubmit } from "@/components/projects/scene-dialog";
 import { API_URL, ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useProject, useSpec, useStoryboard } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 const GENERATE = "storyboard.generate";
 
@@ -108,7 +109,7 @@ export default function StoryboardStep() {
           The last storyboard run failed: {lastGenerate.error}
         </p>
       )}
-      {error && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+      {error && <ErrorState error={error} />}
 
       {scenes.length === 0 ? (
         !generating && (
@@ -257,8 +258,7 @@ function SceneCard({
   const watch = useJobWatcher();
   const [editing, setEditing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [text, setText] = useState(scene.onScreenText);
-  useEffect(() => setText(scene.onScreenText), [scene.onScreenText]);
+  const [text, setText] = useSyncedState(scene.onScreenText, () => scene.onScreenText);
   const [instruction, setInstruction] = useState("");
   const [reviseOpen, setReviseOpen] = useState(false);
   const [revising, setRevising] = useState(false);

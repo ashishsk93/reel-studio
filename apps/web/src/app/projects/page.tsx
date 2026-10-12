@@ -6,8 +6,7 @@ import { STEPS, formatInr, isStepDone, type ProjectSummaryDto } from "@reel/shar
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState, PageHeader } from "@/components/page-header";
-import { errorMessage } from "@/lib/api";
+import { EmptyState, ErrorState, PageHeader } from "@/components/page-header";
 import { useProjects } from "@/lib/queries";
 
 export default function ProjectsPage() {
@@ -24,7 +23,7 @@ export default function ProjectsPage() {
           </Button>
         }
       />
-      {error && <p className="text-sm text-destructive">{errorMessage(error)}</p>}
+      {error && <ErrorState error={error} />}
       {isPending ? (
         <div className="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }, (_, i) => (

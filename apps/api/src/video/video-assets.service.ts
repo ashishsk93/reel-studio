@@ -6,6 +6,7 @@ import {
   ISSUE_SEVERITIES,
   VERDICTS,
   VIDEO_FIX_KINDS,
+  videoAssistantChecked,
   videoReviewChecked,
   type JobStatus,
   type SegmentDto,
@@ -81,7 +82,7 @@ const StoredShotSchema = z.object({
   suggestedIn: z.number(),
   suggestedOut: z.number(),
 });
-const StoredVideoFixSchema = z.object({
+export const StoredVideoFixSchema = z.object({
   title: z.string(),
   kind: z.enum(VIDEO_FIX_KINDS),
   shot: z.number().nullable(),
@@ -89,7 +90,7 @@ const StoredVideoFixSchema = z.object({
   instruction: z.string(),
   motion: z.string().nullable(),
 });
-type StoredVideoFix = z.infer<typeof StoredVideoFixSchema>;
+export type StoredVideoFix = z.infer<typeof StoredVideoFixSchema>;
 
 const ACTIVE = new Set<JobStatus>(['queued', 'running']);
 
@@ -239,29 +240,100 @@ export class VideoAssetsService implements OnModuleInit {
       verdict: readJson(z.enum(VERDICTS), review.verdict, 'warn'),
       summary: review.summary,
       shots: readJson(z.array(StoredShotSchema), review.shots, []),
-      fixes: fixes.map((fix, i): VideoFixDto => {
-        const built = fix.kind === 'regenerate_shot' ? this.fixCard(fix, ctx) : null;
-        return {
-          title: fix.title,
-          kind: fix.kind,
-          shot: fix.shot,
-          sceneId: fix.sceneId,
-          instruction: fix.instruction,
-          motion: fix.motion,
-          card: built
-            ? {
-                prompt: built.prompt,
-                attachments: built.attachments.map((a) => ({ index: a.index, label: a.label, kind: a.kind, id: a.id, url: this.storage.url(a.path), fileName: a.fileName })),
-                missing: built.missing,
-                notes: ['Single-scene prompt: generate this shot alone, then upload it as a replacement shot.'],
-              }
-            : null,
-          zipUrl: built ? this.storage.apiUrl(`/reviews/${review.id}/video-fixes/${i}/attachments.zip`) : null,
-        };
-      }),
+      fixes: fixes.map((fix, i) => this.fixDto(fix, ctx, this.storage.apiUrl(`/reviews/${review.id}/video-fixes/${i}/attachments.zip`))),
       model: review.model,
       createdAt: review.createdAt.toISOString(),
     };
+  }
+
+  /** A stored fix as shown in the UI, with its single-scene prompt card for "regenerate this shot". */
+  fixDto(fix: StoredVideoFix, ctx: VideoContext, zipUrl: string): VideoFixDto {
+    const built = fix.kind === 'regenerate_shot' ? this.fixCard(fix, ctx) : null;
+    return {
+      title: fix.title,
+      kind: fix.kind,
+      shot: fix.shot,
+      sceneId: fix.sceneId,
+      instruction: fix.instruction,
+      motion: fix.motion,
+      card: built
+        ? {
+            prompt: built.prompt,
+            attachments: built.attachments.map((a) => ({ index: a.index, label: a.label, kind: a.kind, id: a.id, url: this.storage.url(a.path), fileName: a.fileName })),
+            missing: built.missing,
+            notes: ['Single-scene prompt: generate this shot alone, then upload it as a replacement shot.'],
+          }
+        : null,
+      zipUrl: built ? zipUrl : null,
+    };
+  }
+
+  /**
+   * One turn of the modification assistant on a video: Claude sees the shots, the current prompt,
+   * the latest review and the frames, and answers with a replacement shot or a prompt rewrite.
+   */
+  async assistantTurn(
+    assetId: string,
+    request: string,
+    earlier: Array<{ role: string; content: string }>,
+  ): Promise<{ reply: string; fix: StoredVideoFix | null; checkAfter: string[] }> {
+    const asset = await this.findVideo(assetId);
+    const job = await this.video.find(asset.videoJobId!);
+    const ctx = await this.video.context(job.projectId);
+    const spec = await this.product.get(job.projectId);
+    const expected = this.video.expectedShots(job);
+    const bounds = readJson(ShotBoundsSchema, asset.shotBounds, []);
+    const frames = readJson(FramesSchema, asset.frames, []);
+    if (!bounds.length || !frames.length) throw new Error('Wait for the video to finish processing.');
+    const { shotText, compare, frameParts } = this.reviewMaterial(ctx, expected, bounds, frames);
+    const review = await this.prisma.review.findFirst({ where: { assetId }, orderBy: { createdAt: 'desc' } });
+    const reviewText = review
+      ? [
+          `Latest review: ${review.verdict}. ${review.summary}`,
+          ...readJson(z.array(StoredShotSchema), review.shots, []).flatMap((s) => s.issues.map((x) => `- Shot ${s.shot} (${x.severity}): ${x.description}`)),
+        ].join('\n')
+      : 'Not reviewed yet.';
+
+    const result = await this.llm.call({
+      task: 'assistant',
+      schema: videoAssistantChecked(bounds.length),
+      system: [this.prompts.render('video-assistant'), personaBlock(ctx.project.influencer), ...(spec ? [productBlock(spec)] : [])],
+      content: [
+        {
+          type: 'text',
+          text: [
+            `## Video: ${this.video.jobTitle(job)}, version ${asset.version}, ${(asset.durationSec ?? 0).toFixed(2)} s, ${bounds.length} shot(s), ${job.mode === 'single' ? 'single-scene' : 'multi-shot'}`,
+            ...shotText,
+            '',
+            'The Kling prompt that was used:',
+            this.video.build(ctx, job).prompt,
+            '',
+            reviewText,
+          ].join('\n'),
+        },
+        { type: 'text', text: 'References:' },
+        ...compare,
+        { type: 'text', text: `Frames (${frameParts.length}, in time order):` },
+        ...frameParts,
+        {
+          type: 'text',
+          text: [
+            earlier.length ? 'Conversation so far:' : '',
+            ...earlier.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
+            '',
+            `User: ${request}`,
+          ]
+            .filter((l, i) => l !== '' || i > 0)
+            .join('\n'),
+        },
+      ],
+      projectId: job.projectId,
+      influencerId: ctx.project.influencerId,
+    });
+    const out = result.data;
+    const shot = out.fix ? (out.fix.shot ?? (bounds.length === 1 ? 1 : null)) : null;
+    const fix: StoredVideoFix | null = out.fix ? { ...out.fix, shot, sceneId: shot ? (bounds[shot - 1]?.sceneId ?? null) : null } : null;
+    return { reply: out.reply.trim(), fix, checkAfter: out.checkAfter.map((c) => c.trim()).filter(Boolean) };
   }
 
   /** Single-scene prompt for a "regenerate this shot" fix. */
@@ -409,16 +481,13 @@ export class VideoAssetsService implements OnModuleInit {
 
   // ---------- review ----------
 
-  private async review(assetId: string): Promise<string> {
-    const asset = await this.findVideo(assetId);
-    const job = await this.video.find(asset.videoJobId!);
-    const ctx = await this.video.context(job.projectId);
-    const spec = await this.product.get(job.projectId);
-    const expected = this.video.expectedShots(job);
-    const bounds = readJson(ShotBoundsSchema, asset.shotBounds, []);
-    const frames = readJson(FramesSchema, asset.frames, []);
-    if (!bounds.length || !frames.length) throw new Error('The video has not been processed yet.');
-    const duration = asset.durationSec ?? bounds[bounds.length - 1].end;
+  /** Shot descriptions, comparison images and labelled frames: what Claude sees of a video. */
+  private reviewMaterial(
+    ctx: VideoContext,
+    expected: ReturnType<VideoService['expectedShots']>,
+    bounds: z.infer<typeof ShotBoundsSchema>,
+    frames: z.infer<typeof FramesSchema>,
+  ): { shotText: string[]; compare: LlmPart[]; frameParts: LlmPart[] } {
     const sceneOf = (sceneId: string) => ctx.scenes.find((s) => s.id === sceneId);
 
     const shotText = bounds.map((b, i) => {
@@ -454,6 +523,20 @@ export class VideoAssetsService implements OnModuleInit {
       const shot = bounds.findIndex((b) => f.t >= b.start && f.t < b.end);
       return { type: 'image', path: f.path, label: `Frame t=${f.t.toFixed(2)} s · shot ${(shot < 0 ? bounds.length - 1 : shot) + 1}` };
     });
+    return { shotText, compare, frameParts };
+  }
+
+  private async review(assetId: string): Promise<string> {
+    const asset = await this.findVideo(assetId);
+    const job = await this.video.find(asset.videoJobId!);
+    const ctx = await this.video.context(job.projectId);
+    const spec = await this.product.get(job.projectId);
+    const expected = this.video.expectedShots(job);
+    const bounds = readJson(ShotBoundsSchema, asset.shotBounds, []);
+    const frames = readJson(FramesSchema, asset.frames, []);
+    if (!bounds.length || !frames.length) throw new Error('The video has not been processed yet.');
+    const duration = asset.durationSec ?? bounds[bounds.length - 1].end;
+    const { shotText, compare, frameParts } = this.reviewMaterial(ctx, expected, bounds, frames);
 
     const result = await this.llm.call({
       task: 'video_review',

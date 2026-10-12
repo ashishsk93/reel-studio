@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   IMAGE_MODELS,
   OUTFIT_STATES,
@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/page-header";
 import { ROLE_LABEL } from "@/components/projects/product-image-dropzone";
 import { cn } from "@/lib/utils";
+import { useSyncedState } from "@/lib/hooks";
 
 export const SCENE_LABEL: Record<string, string> = {
   unboxing: "Unboxing",
@@ -160,16 +161,13 @@ export function SceneDialog({
   saving?: boolean;
   onSubmit: (value: SceneSubmit) => void;
 }) {
-  const [form, setForm] = useState<SceneEditable>(BLANK_SCENE);
-  const [override, setOverride] = useState(false);
-  const [prompt, setPrompt] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(scene ? pick(scene) : { ...BLANK_SCENE, productRoles: availableRoles.includes("front") ? ["front"] : availableRoles.slice(0, 1) });
-    setOverride(scene?.promptOverride ?? false);
-    setPrompt(scene?.imagePrompt ?? "");
-  }, [open, scene, availableRoles]);
+  // Fresh from the scene each time the dialog opens.
+  const opened = open ? `${scene?.id ?? "new"}:${scene?.updatedAt ?? ""}` : null;
+  const [form, setForm] = useSyncedState<SceneEditable>(opened, () =>
+    scene ? pick(scene) : { ...BLANK_SCENE, productRoles: availableRoles.includes("front") ? ["front"] : availableRoles.slice(0, 1) },
+  );
+  const [override, setOverride] = useSyncedState(opened, () => scene?.promptOverride ?? false);
+  const [prompt, setPrompt] = useSyncedState(opened, () => scene?.imagePrompt ?? "");
 
   const set = <K extends keyof SceneEditable>(key: K, value: SceneEditable[K]) => setForm({ ...form, [key]: value });
   const toggleRole = (role: ProductImageRole) =>

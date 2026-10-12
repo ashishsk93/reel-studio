@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveRestore, ArrowLeft, CheckCircle2, Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
@@ -27,9 +27,11 @@ import { PersonaForm, pickPersona, type PersonaDraft } from "@/components/influe
 import { CreatorPlan } from "@/components/influencers/creator-plan";
 import { ReferenceGallery } from "@/components/influencers/reference-gallery";
 import { PromptCard } from "@/components/prompt-card";
+import { ErrorState } from "@/components/page-header";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher } from "@/lib/jobs";
 import { keys, useInfluencer } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 export default function InfluencerPage() {
   return (
@@ -71,7 +73,7 @@ function InfluencerDetail() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending || !influencer) return <Skeleton className="h-96 rounded-xl" />;
 
   return (
@@ -179,13 +181,12 @@ function InfluencerDetail() {
 function ProfileTab({ influencer }: { influencer: InfluencerDetailDto }) {
   const queryClient = useQueryClient();
   const watch = useJobWatcher();
-  const [draft, setDraft] = useState<PersonaDraft>(() => pickPersona(influencer));
+  // Server data replaced (e.g. after a regenerate): reset the form.
+  const [draft, setDraft] = useSyncedState<PersonaDraft>(influencer, () => pickPersona(influencer));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [instruction, setInstruction] = useState("");
   const [regenerating, setRegenerating] = useState(false);
 
-  // Server data replaced (e.g. after a regenerate): reset the form.
-  useEffect(() => setDraft(pickPersona(influencer)), [influencer]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(pickPersona(influencer));
 
   const save = useMutation({

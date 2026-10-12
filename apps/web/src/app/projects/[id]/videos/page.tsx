@@ -16,6 +16,7 @@ import {
   Trash2,
   Upload,
   XCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { JobDto, VideoAssetDto, VideoJobDto, VideoStepDto } from "@reel/shared";
@@ -33,12 +34,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { VERDICT_STYLE } from "@/components/assets/review-card";
 import { SCENE_LABEL } from "@/components/projects/scene-dialog";
 import { JobCard } from "@/components/video/job-card";
 import { TimelineEditor } from "@/components/video/timeline-editor";
 import { VideoReviewCard } from "@/components/video/video-review-card";
+import { AssistantPanel } from "@/components/assets/assistant-panel";
 import { api, errorMessage } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
 import { projectKeys, useVideoStep } from "@/lib/queries";
@@ -62,7 +64,7 @@ function VideosStep() {
   useJobRefresh(["video.process", "video.review", "video.prompt"], projectKeys.video(id));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["projects", id] });
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending || !data) return <Skeleton className="h-96 rounded-xl" />;
   if (data.jobs.length === 0) {
     return (
@@ -316,6 +318,7 @@ function VideoDetail({
   onChanged: () => Promise<unknown>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const onError = (e: unknown) => toast.error(errorMessage(e));
   const approve = useMutation({ mutationFn: () => api.post(`/assets/${asset.id}/approve`), onSuccess: onChanged, onError });
   const reject = useMutation({ mutationFn: () => api.post(`/assets/${asset.id}/reject`), onSuccess: onChanged, onError });
@@ -361,6 +364,9 @@ function VideoDetail({
           )}
           <Button size="sm" variant="ghost" onClick={() => rereview.mutate()} disabled={Boolean(busy) || rereview.isPending}>
             <RefreshCw /> Re-review
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAssistantOpen(true)} disabled={!processed}>
+            <Sparkles /> Modify
           </Button>
           <AlertDialog>
             <AlertDialogTrigger render={<Button size="sm" variant="ghost" className="text-destructive" />}>
@@ -414,7 +420,7 @@ function VideoDetail({
           <TimelineEditor asset={asset} expected={job.expectedShots} sceneLabel={sceneLabel} videoRef={videoRef} onSaved={onChanged} />
           <div>
             {asset.review ? (
-              <VideoReviewCard review={asset.review} sceneLabel={sceneLabel} onSeek={seek} onReplacementCreated={onChanged} />
+              <VideoReviewCard review={asset.review} jobId={job.id} sceneLabel={sceneLabel} onSeek={seek} onReplacementCreated={onChanged} />
             ) : (
               !busy && (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
@@ -433,6 +439,19 @@ function VideoDetail({
           <p className="text-sm text-muted-foreground">Waiting for processing to start…</p>
         )
       )}
+      <AssistantPanel
+        asset={{
+          id: asset.id,
+          version: asset.version,
+          url: asset.url,
+          kind: "video",
+          jobId: job.id,
+          issues: (asset.review?.shots ?? []).flatMap((s) => s.issues.map((i) => `shot ${s.shot}: ${i.description}`)),
+        }}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        onEdited={onChanged}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 export type Theme = "light" | "dark" | "system";
 type Resolved = "light" | "dark";
@@ -31,23 +31,27 @@ function readStored(): Theme {
   }
 }
 
+const listeners = new Set<() => void>();
+
+/** Re-read on a theme change here, in another tab, or of the OS setting. */
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  const media = matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    listeners.delete(listener);
+    media.removeEventListener("change", listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+const resolve = (theme: Theme): Resolved => (theme === "system" ? systemTheme() : theme);
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  // undefined until mounted, so server and first client render agree
-  const [resolvedTheme, setResolved] = useState<Resolved>();
-
-  useEffect(() => {
-    const initial = readStored();
-    setThemeState(initial);
-    setResolved(initial === "system" ? systemTheme() : initial);
-
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if (readStored() === "system") setResolved(systemTheme());
-    };
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
+  const theme = useSyncExternalStore<Theme>(subscribe, readStored, () => "system");
+  // undefined on the server, so server and first client render agree
+  const resolvedTheme = useSyncExternalStore<Resolved | undefined>(subscribe, () => resolve(readStored()), () => undefined);
 
   useEffect(() => {
     if (!resolvedTheme) return;
@@ -61,8 +65,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       // private mode: theme just won't persist
     }
-    setThemeState(next);
-    setResolved(next === "system" ? systemTheme() : next);
+    listeners.forEach((listener) => listener());
   }, []);
 
   const value = useMemo(() => ({ theme, resolvedTheme, setTheme }), [theme, resolvedTheme, setTheme]);

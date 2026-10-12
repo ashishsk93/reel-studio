@@ -8,6 +8,7 @@ import { BarChart3, Clapperboard, Moon, Settings, Store, Sun, Users } from "luci
 import { useTheme } from "@/lib/theme";
 import type { HealthDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
+import { Shortcuts } from "@/components/shortcuts";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +57,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="mt-auto flex flex-col gap-3">
           <StatusPanel />
-          <ThemeToggle />
+          <div className="flex flex-col">
+            <Shortcuts />
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Loader2, Trash2, Upload } from "lucide-react";
@@ -25,6 +25,7 @@ import { InfluencerPicker, PriceModeField, SourcePicker } from "@/components/pro
 import { ProductImageDropzone, RoleSelect, type PendingImage } from "@/components/projects/product-image-dropzone";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { projectKeys, useInfluencers, useProject, useSources, useSpec } from "@/lib/queries";
+import { useSyncedState } from "@/lib/hooks";
 
 function pick(p: ProjectDto) {
   return {
@@ -162,9 +163,8 @@ function DetailsCard({ project }: { project: ProjectDto }) {
   const queryClient = useQueryClient();
   const influencers = useInfluencers();
   const sources = useSources();
-  const [form, setForm] = useState(() => pick(project));
+  const [form, setForm] = useSyncedState(project, () => pick(project));
   const [errors, setErrors] = useState<Record<string, string>>({});
-  useEffect(() => setForm(pick(project)), [project]);
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(project));
   const set = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
 

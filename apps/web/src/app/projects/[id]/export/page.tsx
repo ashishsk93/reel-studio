@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton } from "@/components/copy-button";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { JobBanner } from "@/components/projects/job-banner";
 import { api, errorMessage } from "@/lib/api";
 import { useJobRefresh, useJobWatcher, useProjectJobs } from "@/lib/jobs";
@@ -25,7 +25,7 @@ export default function ExportPage() {
   const watch = useJobWatcher();
   const { data: project } = useProject(id);
   const { data: compose } = useComposeStep(id);
-  const { data: renders, isPending } = useRenders(id);
+  const { data: renders, isPending, error } = useRenders(id);
   const jobs = useProjectJobs(id);
   useJobRefresh(["render.final"], projectKeys.renders(id));
   const running = jobs.active("render.final");
@@ -48,6 +48,7 @@ export default function ExportPage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
+  if (error) return <ErrorState error={error} />;
   if (isPending || !project) return <Skeleton className="h-96 rounded-xl" />;
   const latest = renders?.find((r) => r.status === "succeeded");
   const current = renders?.[0];

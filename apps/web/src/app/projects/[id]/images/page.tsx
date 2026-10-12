@@ -9,12 +9,12 @@ import type { SceneImagesDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { PromptCard } from "@/components/prompt-card";
 import { AssetWorkbench } from "@/components/assets/asset-workbench";
 import { VERDICT_STYLE } from "@/components/assets/review-card";
 import { MODEL_LABEL, SCENE_LABEL, SHOT_LABEL } from "@/components/projects/scene-dialog";
-import { API_URL, errorMessage } from "@/lib/api";
+import { API_URL } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
 import { projectKeys, useImagesStep, useProject, useSetting } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ function ImagesStep() {
   const { data, error, isPending } = useImagesStep(id);
   useJobRefresh(["asset.review", "assistant.reply"], projectKeys.images(id));
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending || !project) return <Skeleton className="h-96 rounded-xl" />;
   if (!data || data.total === 0) {
     return (

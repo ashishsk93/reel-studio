@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Downloaded MediaPipe runtime (pnpm --filter @reel/web mediapipe), not our code.
+    "public/mediapipe/**",
   ]),
 ]);
 

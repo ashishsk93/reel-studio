@@ -16,7 +16,7 @@ export function Stepper({
   current: StepKey | undefined;
 }) {
   return (
-    <nav className="mb-8 overflow-x-auto">
+    <nav className="mb-8 overflow-x-auto" data-stepper>
       <ol className="flex min-w-max items-center gap-1 rounded-xl border bg-card p-1.5">
         {STEPS.map((step, i) => {
           const open = canOpenStep(step.key, furthest);

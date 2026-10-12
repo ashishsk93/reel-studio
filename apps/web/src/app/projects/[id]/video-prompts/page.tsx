@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import type { VideoMode, VideoStepDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-header";
 import { JobCard } from "@/components/video/job-card";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
@@ -50,7 +50,7 @@ export default function VideoPromptsPage() {
     }
   };
 
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
+  if (error) return <ErrorState error={error} />;
   if (isPending || !data) return <Skeleton className="h-96 rounded-xl" />;
 
   const unapproved = images ? images.total - images.approved : 0;
