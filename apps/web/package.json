@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "mediapipe": "node scripts/fetch-mediapipe.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@mediapipe/tasks-vision": "^1.1.0",
     "@reel/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.1",
     "class-variance-authority": "^0.7.1",

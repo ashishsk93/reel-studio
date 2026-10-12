@@ -18,9 +18,9 @@ export class MediaService {
     private readonly logs: LogService,
   ) {}
 
-  private async run(bin: 'ffmpeg' | 'ffprobe', args: string[], projectId: string | null, signal?: AbortSignal) {
+  async run(bin: 'ffmpeg' | 'ffprobe', args: string[], projectId: string | null, signal?: AbortSignal, onStderrLine?: (line: string) => void) {
     const command = bin === 'ffmpeg' ? this.config.ffmpegPath : this.config.ffprobePath;
-    const result = await runProcess(command, args, { timeoutMs: 10 * 60_000, signal });
+    const result = await runProcess(command, args, { timeoutMs: 20 * 60_000, signal, onStderrLine });
     const tail = result.stderr.split(/\r?\n/).filter(Boolean).slice(-8).join('\n');
     this.logs.write('ffmpeg', projectId, { bin, args, code: result.code, durationMs: result.durationMs, stderrTail: result.code === 0 ? undefined : tail });
     if (result.code !== 0) throw new MediaError(`${bin} failed (exit ${result.code}): ${tail.slice(-400)}`);
@@ -58,10 +58,10 @@ export class MediaService {
     return files.map((f) => path.join(dir, f));
   }
 
-  async frameAt(input: string, t: number, output: string, projectId: string | null): Promise<void> {
+  async frameAt(input: string, t: number, output: string, projectId: string | null, height?: number): Promise<void> {
     await fs.mkdir(path.dirname(output), { recursive: true });
     const tmp = `${output}.part.jpg`;
-    await this.run('ffmpeg', frameAtArgs(input, t, tmp), projectId);
+    await this.run('ffmpeg', frameAtArgs(input, t, tmp, height), projectId);
     await fs.rename(tmp, output);
   }
 }

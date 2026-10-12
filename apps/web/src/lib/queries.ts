@@ -9,6 +9,8 @@ import type {
   SettingKey,
   SettingValue,
   VideoStepDto,
+  ComposeStepDto,
+  RenderDto,
   InfluencerDto,
   ProductSpecDto,
   ProjectDto,
@@ -46,6 +48,8 @@ export const projectKeys = {
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   images: (id: string) => ["projects", id, "images"] as const,
   video: (id: string) => ["projects", id, "video"] as const,
+  compose: (id: string) => ["projects", id, "compose"] as const,
+  renders: (id: string) => ["projects", id, "renders"] as const,
 };
 
 /** Under the influencer's key, so every influencer invalidation refreshes the plan too. */
@@ -118,4 +122,12 @@ export function useVideoStep(id: string, enabled = true) {
     queryFn: () => api.get<VideoStepDto>(`/projects/${id}/video`),
     enabled,
   });
+}
+
+export function useComposeStep(id: string) {
+  return useQuery({ queryKey: projectKeys.compose(id), queryFn: () => api.get<ComposeStepDto>(`/projects/${id}/compose`) });
+}
+
+export function useRenders(id: string) {
+  return useQuery({ queryKey: projectKeys.renders(id), queryFn: () => api.get<RenderDto[]>(`/projects/${id}/renders`) });
 }

@@ -464,6 +464,122 @@ export interface VideoStepDto {
   missingSceneIds: string[];
 }
 
+// ---------- Steps 7–8: compose, cover, captions, render ----------
+
+export interface DetectionsDto {
+  faces: Box[];
+  hands: Box[];
+  persons: Box[];
+  /** Key garment areas from Claude (badge placement avoids them). */
+  details: Box[];
+  detected: boolean;
+  detailsChecked: boolean;
+}
+
+export interface BadgePlacementDto {
+  anchor: string;
+  /** Top-left in output pixels (1080×1920). */
+  x: number;
+  y: number;
+  scale: number;
+  manual: boolean;
+  overlapScore: number;
+}
+
+export interface ComposeSegmentDto {
+  id: string;
+  sceneId: string;
+  sceneOrder: number;
+  sceneType: SceneType;
+  assetId: string;
+  videoUrl: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  inSec: number;
+  outSec: number;
+  onScreenText: string;
+  textOverlayUrl: string;
+  textBox: Box | null;
+  /** Scene type is in Settings → badge scenes and the product is in frame. */
+  badgeEligible: boolean;
+  badgeEnabled: boolean;
+  placement: BadgePlacementDto | null;
+  placementWarning: string | null;
+  detections: DetectionsDto;
+  /** Frames (video times) used for detection and previews. */
+  sampleTimes: number[];
+}
+
+export interface CtaDto {
+  text: string;
+  durationSec: number;
+  background: 'last_frame' | 'chosen_frame';
+  frame: { segmentId: string; timeSec: number } | null;
+  zoom: boolean;
+  darken: number;
+}
+
+export interface CoverDto {
+  candidates: Array<{ segmentId: string; assetId: string; timeSec: number; url: string; label: string }>;
+  best: number | null;
+  reason: string;
+  titleOptions: string[];
+  chosen: { candidate: number; title: string } | null;
+  plainUrl: string | null;
+  titledUrl: string | null;
+}
+
+export interface CaptionPackageDto {
+  caption: string;
+  hashtags: string[];
+  firstComment: string | null;
+  dmTemplate: string;
+  checklist: Array<{ item: string; done: boolean }>;
+  updatedAt: string;
+}
+
+export interface ComposeStepDto {
+  segments: ComposeSegmentDto[];
+  badge: { url: string; w: number; h: number } | null;
+  priceLabel: string | null;
+  priceMode: PriceMode;
+  source: { displayName: string; logoUrl: string | null };
+  safeZone: { top: number; bottom: number; rightLower: number; marginPx: number };
+  cta: CtaDto;
+  ctaPreviewUrl: string;
+  cover: CoverDto;
+  captions: CaptionPackageDto | null;
+  music: { url: string; name: string; durationSec: number } | null;
+  /** Reel length: segments plus the CTA. */
+  totalSec: number;
+  warnings: string[];
+}
+
+export interface QaCheckDto {
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface RenderDto {
+  id: string;
+  status: JobStatus;
+  createdAt: string;
+  finishedAt: string | null;
+  durationSec: number | null;
+  files: Array<{ name: string; url: string; bytes: number }>;
+  zipUrl: string | null;
+  qa: {
+    checks: QaCheckDto[];
+    blackFrames: Array<{ start: number; end: number; nearJoin: boolean }>;
+    contactSheetUrl: string | null;
+  } | null;
+  warnings: string[];
+  error: string | null;
+  progress: number;
+  message: string;
+}
+
 export interface ApiErrorBody {
   statusCode: number;
   message: string;

@@ -139,3 +139,47 @@ export const ShotBoundsUpdateSchema = z.object({
     .min(1),
 });
 export type ShotBoundsUpdate = z.infer<typeof ShotBoundsUpdateSchema>;
+
+// ---------- Steps 7–8 ----------
+
+const NormBox = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() });
+
+export const SegmentComposeUpdateSchema = z.object({
+  onScreenText: z.string().trim().max(120).optional(),
+  badgeEnabled: z.boolean().optional(),
+  /** A dragged badge (output pixels); null returns it to automatic placement. */
+  badgePlacement: z.object({ x: z.number(), y: z.number(), scale: z.number().min(0.4).max(1.5) }).nullable().optional(),
+});
+export type SegmentComposeUpdate = z.infer<typeof SegmentComposeUpdateSchema>;
+
+/** MediaPipe results from the browser, normalised to the source video frame. */
+export const SegmentDetectionsSchema = z.object({
+  faces: z.array(NormBox),
+  hands: z.array(NormBox),
+  persons: z.array(NormBox),
+});
+export type SegmentDetections = z.infer<typeof SegmentDetectionsSchema>;
+
+export const CtaUpdateSchema = z.object({
+  text: z.string().trim().min(1).max(120).optional(),
+  durationSec: z.number().min(2).max(4).optional(),
+  background: z.enum(['last_frame', 'chosen_frame']).optional(),
+  frame: z.object({ segmentId: z.string(), timeSec: z.number().min(0) }).nullable().optional(),
+  zoom: z.boolean().optional(),
+  darken: z.number().min(0).max(0.8).optional(),
+});
+export type CtaUpdate = z.infer<typeof CtaUpdateSchema>;
+
+export const CoverChooseSchema = z.object({
+  candidate: z.number().int().min(0),
+  title: z.string().trim().min(1).max(60),
+});
+
+export const CaptionsUpdateSchema = z.object({
+  caption: z.string().optional(),
+  hashtags: z.array(z.string().trim().min(2)).optional(),
+  firstComment: z.string().nullable().optional(),
+  dmTemplate: z.string().optional(),
+  checklist: z.array(z.object({ item: z.string().trim().min(1), done: z.boolean() })).optional(),
+});
+export type CaptionsUpdate = z.infer<typeof CaptionsUpdateSchema>;

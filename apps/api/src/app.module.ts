@@ -1,5 +1,7 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { AssetsModule } from './assets/assets.module';
+import { ComposeModule } from './compose/compose.module';
+import { RenderModule } from './render/render.module';
 import { ConfigModule } from './config/config.module';
 import type { AppConfig } from './config/env';
 import type { ToolVersions } from './config/startup-checks';
@@ -29,6 +31,8 @@ export class AppModule {
         InfluencersModule,
         ProjectsModule,
         AssetsModule,
+        ComposeModule,
+        RenderModule,
         SourcesModule,
         UsageModule,
       ],

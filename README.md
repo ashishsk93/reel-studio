@@ -12,7 +12,7 @@ The brief is in [docs/reel_studio_claude_code_prompt.md](docs/reel_studio_claude
 | 2 | New project, product analysis, storyboard, attachment zips | ✅ |
 | 3 | Image review, fix prompts, modification assistant, character-creator reference plan | ✅ |
 | 4 | Video prompts, cut detection, video review, timeline editor | ✅ |
-| 5 | Compose, badge placement, CTA, cover, captions, render, export | — |
+| 5 | Compose, badge placement, CTA, cover, captions, render, export | ✅ |
 | 6 | Polish | — |
 
 ## Setup
@@ -24,6 +24,7 @@ pnpm i
 cp .env.example .env        # then fill in ANTHROPIC_API_KEY
 pnpm db:migrate             # creates data/app.db
 pnpm db:seed                # Aanya, Meera, and the Amazon / Myntra / Meesho sources
+pnpm --filter @reel/web mediapipe   # face / pose / hand models for badge placement (public/mediapipe)
 pnpm dev                    # API on :4000, web on :3000
 ```
 
@@ -53,14 +54,14 @@ Check with `ffmpeg -version` and `ffprobe -version`.
 
 Video uploads: MP4, MOV, M4V, WebM or MKV, up to 60 s and 1 GB.
 
-### Fonts (needed from phase 5)
+### Fonts
 
 Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/fonts/` (the folder is git-ignored):
 
 - **Poppins ExtraBold** (`Poppins-ExtraBold.ttf`) from Google Fonts: https://fonts.google.com/specimen/Poppins
 - **Noto Color Emoji** (`NotoColorEmoji.ttf`): https://fonts.google.com/noto/specimen/Noto+Color+Emoji
 
-## Making a Reel (steps 1–6)
+## Making a Reel (steps 1–8)
 
 1. **Projects → New project.** Drop the listing photos and tag each one (front, back, detail, pants…). Pick the source, price, occasion and influencer. The badge preview shows how the price will appear (Amazon defaults to "Under ₹X").
 2. **Analysis** starts automatically. Claude writes the garment spec, a 6–10 item must-match checklist, the unknowns (never put in prompts) and the paste-ready garment paragraph. Edit anything, then **Save**. **Rewrite from spec** rebuilds the paragraph from your edits.
@@ -88,6 +89,14 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
    The **timeline editor** shows the player with frame stepping, the planned shots, the detected cuts and one pink window per scene. Drag a cut line to move a shot boundary, or a window and its edges to choose what goes in the Reel; the exact frame under the handle is pulled from the server. **Save timeline** keeps your edits (reviews no longer move them); **Reset to suggestion** puts the review's windows back.
 
    A review fix can **regenerate one shot alone**: it gives a single-scene prompt from that scene's approved image, and **Add as replacement shot** creates its own upload slot. An approved replacement is used for that scene instead of the run's shot. **Approve** a video and its windows become the Reel's segments; when every scene has one, step 7 unlocks.
+
+7. **Compose.**
+   - **Text and badge.** Each segment's on-screen text (editable) is drawn exactly as rendered: Poppins ExtraBold, white with a black outline and soft shadow, colour emoji, around 40 % height, moved below her face when detection shows they would overlap. Product scenes (Settings → badge scenes) get the store logo and price pill (the price follows the store's display mode: exact, "Under ₹X" or hidden).
+     When the page opens, MediaPipe runs in the browser on 5 frames per segment to find her face, hands and body, and Claude marks the garment's key detail areas. The badge goes to the best of six safe-zone positions: never on her face or the text, avoiding hands and garment detail, keeping the same corner across segments where it can; if nothing is clean it shrinks to 80 %, then takes the least-overlapping spot with a warning. Drag the badge in the 9:16 preview to place it yourself (**Auto** returns it), toggle **Instagram UI areas** and **Detections** to see what it avoids, and **Check with Claude** looks at the composited frame.
+   - **End card.** "Comment **LINK** and I'll DM you the link 👇" (editable; LINK gets a pink pill, the pointer bounces), 2–4 s, over a freeze of the last frame or a frame you choose, darkened, with a slow zoom.
+   - **Cover.** Claude picks the best frame and writes three titles; pick or edit one and it renders `cover.jpg` and `cover_titled.jpg` (title inside the centre 1080×1440 grid crop, away from her face).
+   - **Caption and music.** Claude writes the hook, outfit lines (facts from the spec), hashtags (always #SlayUrbanSociety and hers) and the LINK DM in her voice; the app adds the CTA line, the store's disclosure lines and the affiliate link. Everything is editable with copy buttons, plus a posting checklist. Copy rules are enforced: no feel, fit, quality or sizing claims, no discounts, urgency or delivery promises. Music is optional: by default the Reel has a silent track for trending audio; an uploaded track is normalised to about -14 LUFS and faded out.
+8. **Export.** **Render the Reel**: one FFmpeg pass (each segment trimmed, scaled to cover, centre-cropped, overlays composited; the end card; concat; 1080×1920, 30 fps, H.264 High, CRF 18, AAC 48 kHz stereo, `+faststart`). Then automatic QA: ffprobe checks, duration (16–20 s), black frames at the joins, and a contact sheet. Download `final.mp4`, the covers, `caption.txt`, `first_comment.txt`, `dm_template.txt`, or everything as a zip, and **Mark as posted**.
 
 Reference images are chosen by the rules in **Settings → Reference image selection rules** (anchor first; `base_front` or `base_hair_up` for full-body shots; `base_three_quarter` for ¾; `turnaround` for back views; anchor only for close-ups), within each image tool's reference limit.
 

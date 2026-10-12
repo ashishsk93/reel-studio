@@ -594,6 +594,7 @@ export class VideoAssetsService implements OnModuleInit {
       orderBy: { createdAt: 'desc' },
     });
     const existing = await this.prisma.segment.findMany({ where: { projectId } });
+    const badgeTypes: string[] = await this.settings.get('compose.badgeSceneTypes');
 
     for (const scene of scenes) {
       const source = this.sourceFor(scene.id, jobs);
@@ -617,7 +618,8 @@ export class VideoAssetsService implements OnModuleInit {
       if (current) {
         await this.prisma.segment.update({ where: { id: current.id }, data });
       } else {
-        await this.prisma.segment.create({ data: { projectId, sceneId: scene.id, onScreenText: scene.onScreenText, ...data } });
+        const eligible = badgeTypes.includes(scene.type) && (scene.showsProduct || scene.outfitState === 'wearing_product');
+        await this.prisma.segment.create({ data: { projectId, sceneId: scene.id, onScreenText: scene.onScreenText, badgeEnabled: eligible, ...data } });
       }
     }
     if (scenes.length > 0) {
@@ -651,6 +653,18 @@ export class VideoAssetsService implements OnModuleInit {
     const rel = `projects/${asset.projectId}/frames/${asset.id}/preview/${n}.jpg`;
     if (!(await this.storage.exists(rel))) {
       await this.media.frameAt(this.storage.abs(asset.normalizedPath), n / FPS, this.storage.abs(rel), asset.projectId);
+    }
+    return this.storage.abs(rel);
+  }
+
+  /** Full-height exact frame (cover, CTA background, composited checks), cached per frame number. */
+  async frameFull(assetId: string, t: number): Promise<string> {
+    const asset = await this.findVideo(assetId);
+    if (!asset.normalizedPath) throw new BadRequestException('The video is still processing.');
+    const n = Math.max(0, Math.min(toFrame(t), toFrame(asset.durationSec ?? 0) - 1));
+    const rel = `projects/${asset.projectId}/frames/${asset.id}/full/${n}.jpg`;
+    if (!(await this.storage.exists(rel))) {
+      await this.media.frameAt(this.storage.abs(asset.normalizedPath), n / FPS, this.storage.abs(rel), asset.projectId, 1920);
     }
     return this.storage.abs(rel);
   }
