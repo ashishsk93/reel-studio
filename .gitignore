@@ -10,3 +10,6 @@ apps/api/assets/fonts/*.ttf
 apps/web/public/mediapipe/
 apps/api/src/generated/
 .DS_Store
+
+# Local reference material, not part of the app
+Old Data/
