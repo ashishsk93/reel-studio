@@ -11,7 +11,7 @@ The brief is in [docs/reel_studio_claude_code_prompt.md](docs/reel_studio_claude
 | 1 | Skeleton, settings, influencer and source CRUD, character-creator persona step, `LlmService`, cost log, jobs and SSE | ✅ |
 | 2 | New project, product analysis, storyboard, attachment zips | ✅ |
 | 3 | Image review, fix prompts, modification assistant, character-creator reference plan | ✅ |
-| 4 | Video prompts, cut detection, video review, timeline editor | — |
+| 4 | Video prompts, cut detection, video review, timeline editor | ✅ |
 | 5 | Compose, badge placement, CTA, cover, captions, render, export | — |
 | 6 | Polish | — |
 
@@ -51,6 +51,8 @@ The API refuses to start, listing every problem at once, if the key is missing i
 
 Check with `ffmpeg -version` and `ffprobe -version`.
 
+Video uploads: MP4, MOV, M4V, WebM or MKV, up to 60 s and 1 GB.
+
 ### Fonts (needed from phase 5)
 
 Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/fonts/` (the folder is git-ignored):
@@ -58,7 +60,7 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
 - **Poppins ExtraBold** (`Poppins-ExtraBold.ttf`) from Google Fonts: https://fonts.google.com/specimen/Poppins
 - **Noto Color Emoji** (`NotoColorEmoji.ttf`): https://fonts.google.com/noto/specimen/Noto+Color+Emoji
 
-## Making a Reel (steps 1–4)
+## Making a Reel (steps 1–6)
 
 1. **Projects → New project.** Drop the listing photos and tag each one (front, back, detail, pants…). Pick the source, price, occasion and influencer. The badge preview shows how the price will appear (Amazon defaults to "Under ₹X").
 2. **Analysis** starts automatically. Claude writes the garment spec, a 6–10 item must-match checklist, the unknowns (never put in prompts) and the paste-ready garment paragraph. Edit anything, then **Save**. **Rewrite from spec** rebuilds the paragraph from your edits.
@@ -72,6 +74,20 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
    - **Modify** opens the modification assistant: describe a change ("make the embroidery denser on the sleeves") and get an edit prompt, the attachments and what to check afterwards. The conversation is kept per image.
 
    **Approve** one image per scene (approving another replaces it). When every scene is approved, step 5 unlocks.
+5. **Video prompts.** Pick a mode (you can switch any time; each mode keeps its own prompts and uploads):
+   - **Multi-shot** (default, saves credits): consecutive scenes in the same place and outfit state become one Kling 3.0 run of up to 15 s. Each run shows one prompt with `Shot N (a–bs): … Hard cut.` markers, the shot plan, the start image (the first scene's approved image) and element references (the other scenes' images, her anchor, the product), 720p, sound off, and a credit estimate. The prompt format is the editable template in **Settings → Kling multi-shot prompt template**.
+   - **Single scene**: one 5 s image-to-video prompt per scene.
+
+   Each shot is generated a little longer than the scene needs (`shotPaddingSec`, default 0.5 s) so there is room to trim. **Rewrite with AI** changes a prompt and keeps the shot markers and consistency lines; **Edit** and **Reset to template** work as for images.
+6. **Videos.** Upload each Kling result under its run. The app:
+   1. probes it, then makes a constant-30 fps H.264 copy (fixes variable frame rate, 24 fps and rotation);
+   2. detects the cuts and matches them to the planned shots (strong cuts within 1 s, weaker changes within 0.5 s of the plan; dashed lines in the timeline mean no cut was found);
+   3. extracts frames (each shot's middle, both sides of every cut, the first and last frame, plus 2 fps up to 24) and Claude reviews them shot by shot: identity drift, forbidden features, garment morphing, flicker, anatomy, and whether the shot matches its scene;
+   4. suggests a window per scene: the scene's duration, starting just after the cut, never in the last 0.3 s of a shot, and avoiding frames Claude marks as drifting.
+
+   The **timeline editor** shows the player with frame stepping, the planned shots, the detected cuts and one pink window per scene. Drag a cut line to move a shot boundary, or a window and its edges to choose what goes in the Reel; the exact frame under the handle is pulled from the server. **Save timeline** keeps your edits (reviews no longer move them); **Reset to suggestion** puts the review's windows back.
+
+   A review fix can **regenerate one shot alone**: it gives a single-scene prompt from that scene's approved image, and **Add as replacement shot** creates its own upload slot. An approved replacement is used for that scene instead of the run's shot. **Approve** a video and its windows become the Reel's segments; when every scene has one, step 7 unlocks.
 
 Reference images are chosen by the rules in **Settings → Reference image selection rules** (anchor first; `base_front` or `base_hair_up` for full-body shots; `base_three_quarter` for ¾; `turnaround` for back views; anchor only for close-ups), within each image tool's reference limit.
 

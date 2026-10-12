@@ -10,3 +10,4 @@ export * from './schemas/project.js';
 export * from './llm/product.js';
 export * from './llm/storyboard.js';
 export * from './llm/review.js';
+export * from './llm/video.js';

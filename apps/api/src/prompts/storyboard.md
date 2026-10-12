@@ -21,7 +21,7 @@ A 2–4 s CTA end segment is added automatically after your scenes; do not plan 
 
 - Never show anything listed as unknown. If the back is unknown, no back views and no full turns.
 - Skip `pieces` for single-piece products. Use `custom` only when the product genuinely needs a different shot (for example a saree drape).
-- Keep scenes that share a setting and outfit state together and consistent (same room description, same lighting), because consecutive scenes with the same setting and outfit are generated as one multi-shot video later. Unboxing to detail usually share her bedroom in her own clothes; the wearing scenes share one setting that suits the occasion (her bedroom mirror area, a balcony with festive lights, a rooftop at golden hour…).
+- Keep scenes that share a setting and outfit state together and consistent (same room description, same lighting), because consecutive scenes with the same setting and outfit are generated as one multi-shot video later. Give scenes in the same place exactly the same `setting` text; put shot-specific details in `description`. Unboxing to detail usually share her bedroom in her own clothes; the wearing scenes share one setting that suits the occasion (her bedroom mirror area, a balcony with festive lights, a rooftop at golden hour…).
 - Durations: about 2–3 s per scene. The scene total must fall inside the range given in the request.
 
 ## Writing `description`

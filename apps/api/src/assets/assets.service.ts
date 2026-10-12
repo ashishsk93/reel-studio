@@ -10,6 +10,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { StorageService } from '../storage/storage.service';
 import { inspectImage } from '../storage/uploads';
 import { StoryboardService } from '../storyboard/storyboard.service';
+import { VideoAssetsService } from '../video/video-assets.service';
 import { toAssetDto, type AssetWithReviews } from './asset.mapper';
 import { REVIEW_JOB, ReviewService } from './review.service';
 
@@ -27,6 +28,7 @@ export class AssetsService {
     private readonly storyboard: StoryboardService,
     private readonly influencers: InfluencersService,
     private readonly reviews: ReviewService,
+    private readonly videos: VideoAssetsService,
   ) {}
 
   // ---------- reads ----------
@@ -125,8 +127,9 @@ export class AssetsService {
     }
   }
 
-  startReview(assetId: string): Promise<JobDto> {
-    return this.reviews.start(assetId);
+  async startReview(assetId: string): Promise<JobDto> {
+    const asset = await this.find(assetId);
+    return asset.videoJobId ? this.videos.startReview(assetId) : this.reviews.start(assetId);
   }
 
   // ---------- decisions ----------
@@ -134,7 +137,9 @@ export class AssetsService {
   /** One approved image per scene (or per character frame); approving another replaces it. */
   async approve(assetId: string): Promise<AssetDto> {
     const asset = await this.find(assetId);
-    if (asset.sceneId) {
+    if (asset.videoJobId) {
+      await this.videos.approve(assetId);
+    } else if (asset.sceneId) {
       const sceneId = asset.sceneId;
       await this.prisma.$transaction([
         this.prisma.asset.updateMany({ where: { sceneId, status: 'approved', id: { not: assetId } }, data: { status: 'pending_review' } }),
@@ -170,6 +175,10 @@ export class AssetsService {
 
   async reject(assetId: string): Promise<AssetDto> {
     const asset = await this.find(assetId);
+    if (asset.videoJobId) {
+      await this.videos.reject(assetId);
+      return this.get(assetId);
+    }
     await this.prisma.asset.update({ where: { id: assetId }, data: { status: 'rejected' } });
     if (asset.status === 'approved') await this.unapprove(asset);
     return this.get(assetId);
@@ -177,6 +186,7 @@ export class AssetsService {
 
   async remove(assetId: string): Promise<void> {
     const asset = await this.find(assetId);
+    if (asset.videoJobId) return this.videos.remove(assetId);
     if (asset.status === 'approved') await this.unapprove(asset);
     await this.prisma.asset.delete({ where: { id: assetId } });
     await this.storage.remove(asset.path);

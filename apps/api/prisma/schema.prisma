@@ -215,7 +215,8 @@ model Asset {
   durationSec    Float?
   probe          Json?
   detectedCuts   Json? // number[]
-  shotBounds     Json? // { sceneId, start, end }[]
+  shotBounds     Json? // { sceneId, start, end, inSec, outSec, matched, manual }[]
+  frames         Json? // { t, path }[] frames extracted for the review
   status         String   @default("pending_review") // pending_review | approved | rejected
   sourcePrompt   String   @default("")
   createdAt      DateTime @default(now())
@@ -256,9 +257,11 @@ model VideoJob {
   id             String   @id @default(cuid())
   projectId      String
   mode           String // multi_shot | single
+  purpose        String   @default("main") // main | replacement (one shot re-generated as a single scene)
   order          Int
   active         Boolean  @default(true)
   prompt         String
+  promptOverride Boolean  @default(false) // prompt edited by hand or rewritten by Claude; don't rebuild
   startAssetId   String
   extraRefs      Json // AttachmentRef[]
   expectedShots  Json // { sceneId, start, end, text }[]

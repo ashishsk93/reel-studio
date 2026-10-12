@@ -17,6 +17,8 @@ import type {
   ShotKind,
   SourceKey,
   Verdict,
+  VideoFixKind,
+  VideoJobPurpose,
   VideoMode,
 } from './enums.js';
 import type { Box } from './llm/review.js';
@@ -323,6 +325,143 @@ export interface CreatorTaskDto {
   /** The reference image this frame produced (or one already tagged with it). */
   reference: ReferenceImageDto | null;
   assets: AssetDto[];
+}
+
+// ---------- Steps 5–6: video prompts, videos, segments ----------
+
+/** A shot as planned: where it should sit in the generated video. */
+export interface ExpectedShotDto {
+  sceneId: string;
+  sceneOrder: number;
+  start: number;
+  end: number;
+  /** Seconds of this scene used in the Reel. */
+  targetSec: number;
+  text: string;
+}
+
+/** A shot as found in an uploaded video, with the window used in the Reel. */
+export interface ShotBoundDto {
+  sceneId: string;
+  start: number;
+  end: number;
+  inSec: number;
+  outSec: number;
+  /** A detected cut was matched to this shot's start (always true for the first shot). */
+  matched: boolean;
+  /** Edited by hand in the timeline; reviews no longer move it. */
+  manual: boolean;
+}
+
+export interface VideoProbeDto {
+  width: number;
+  height: number;
+  fps: number;
+  durationSec: number;
+  codec: string;
+  hasAudio: boolean;
+  vfr: boolean;
+  rotation: number;
+}
+
+export interface VideoShotReviewDto {
+  shot: number;
+  sceneId: string;
+  verdict: Verdict;
+  matchesScene: boolean;
+  notes: string;
+  issues: Array<{ severity: IssueSeverity; description: string; fromSec: number | null; toSec: number | null }>;
+  usableFrom: number | null;
+  usableTo: number | null;
+  suggestedIn: number;
+  suggestedOut: number;
+}
+
+export interface VideoFixDto {
+  title: string;
+  kind: VideoFixKind;
+  shot: number | null;
+  sceneId: string | null;
+  instruction: string;
+  /** regenerate_shot: the new motion line (null keeps the scene's). */
+  motion: string | null;
+  /** regenerate_shot: a single-scene Kling prompt with its start image. */
+  card: PromptCardDto | null;
+  zipUrl: string | null;
+}
+
+export interface VideoReviewDto {
+  id: string;
+  verdict: Verdict;
+  summary: string;
+  shots: VideoShotReviewDto[];
+  fixes: VideoFixDto[];
+  model: string;
+  createdAt: string;
+}
+
+export interface VideoAssetDto {
+  id: string;
+  version: number;
+  url: string;
+  /** CFR H.264 copy used for playback, frames and the render. */
+  normalizedUrl: string | null;
+  status: AssetStatus;
+  createdAt: string;
+  width: number;
+  height: number;
+  durationSec: number;
+  probe: VideoProbeDto | null;
+  cuts: number[] | null;
+  shotBounds: ShotBoundDto[] | null;
+  frames: Array<{ t: number; url: string }>;
+  review: VideoReviewDto | null;
+  /** Latest processing or review job while it is queued, running or failed. */
+  processing: { type: 'process' | 'review'; status: JobStatus; message: string; progress: number; error: string | null } | null;
+}
+
+export interface VideoJobDto {
+  id: string;
+  mode: VideoMode;
+  purpose: VideoJobPurpose;
+  order: number;
+  active: boolean;
+  title: string;
+  sceneIds: string[];
+  durationSec: number;
+  expectedShots: ExpectedShotDto[];
+  settings: { resolution: string; sound: boolean; durationSec: number };
+  creditEstimate: number;
+  promptOverride: boolean;
+  card: PromptCardDto;
+  zipUrl: string;
+  assets: VideoAssetDto[];
+  approvedAssetId: string | null;
+}
+
+export interface SegmentDto {
+  id: string;
+  sceneId: string;
+  assetId: string;
+  videoJobId: string | null;
+  order: number;
+  inSec: number;
+  outSec: number;
+  suggestedInSec: number | null;
+  suggestedOutSec: number | null;
+  onScreenText: string;
+}
+
+export interface VideoStepDto {
+  mode: VideoMode;
+  /** Active jobs of the current mode, then replacement jobs. */
+  jobs: VideoJobDto[];
+  totalSec: number;
+  totalCredits: number;
+  scenes: Array<{ id: string; order: number; type: SceneType; onScreenText: string; targetDurationSec: number; imageUrl: string | null }>;
+  segments: SegmentDto[];
+  /** Scenes without an approved video window yet. */
+  missingSceneIds: string[];
 }
 
 export interface ApiErrorBody {

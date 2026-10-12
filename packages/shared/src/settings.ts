@@ -56,6 +56,10 @@ export const SETTINGS = {
       resolution: z.string(),
       sound: z.boolean(),
       creditsPer5s: z.number().nonnegative(),
+      /** Shortest generation Kling accepts. */
+      minSec: z.number().positive().default(3),
+      /** Extra seconds generated per shot beyond the scene's target, so there is room to trim. */
+      shotPaddingSec: z.number().min(0).max(3).default(0.5),
     }),
     default: {
       label: 'Kling 3.0',
@@ -65,6 +69,8 @@ export const SETTINGS = {
       resolution: '720p',
       sound: false,
       creditsPer5s: 6.25,
+      minSec: 3,
+      shotPaddingSec: 0.5,
     },
   },
   'storyboard.refRules': {

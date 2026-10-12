@@ -4,6 +4,7 @@ import { CreatorService } from '../creator/creator.service';
 import { InfluencersModule } from '../influencers/influencers.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { uploadsModule } from '../storage/uploads';
+import { VideoModule } from '../video/video.module';
 import { AssetContextService } from './asset-context.service';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
@@ -12,7 +13,7 @@ import { ReviewService } from './review.service';
 
 /** Step 4 (generated images, reviews, modification assistant) and the character creator's reference plan. */
 @Module({
-  imports: [uploadsModule(), ProjectsModule, InfluencersModule],
+  imports: [uploadsModule(), ProjectsModule, InfluencersModule, VideoModule],
   controllers: [AssetsController, CreatorController],
   providers: [AssetContextService, ReviewService, AssetsService, AssistantService, CreatorService],
   exports: [AssetsService],

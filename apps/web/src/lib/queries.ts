@@ -8,6 +8,7 @@ import type {
   InfluencerDetailDto,
   SettingKey,
   SettingValue,
+  VideoStepDto,
   InfluencerDto,
   ProductSpecDto,
   ProjectDto,
@@ -44,6 +45,7 @@ export const projectKeys = {
   spec: (id: string) => ["projects", id, "spec"] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
   images: (id: string) => ["projects", id, "images"] as const,
+  video: (id: string) => ["projects", id, "video"] as const,
 };
 
 /** Under the influencer's key, so every influencer invalidation refreshes the plan too. */
@@ -107,5 +109,13 @@ export function useSetting<K extends SettingKey>(key: K) {
     queryKey: keys.settings,
     queryFn: () => api.get<Array<{ key: SettingKey; value: unknown }>>("/settings"),
     select: (rows) => (rows.find((r) => r.key === key)?.value ?? SETTINGS[key].default) as SettingValue<K>,
+  });
+}
+
+export function useVideoStep(id: string, enabled = true) {
+  return useQuery({
+    queryKey: projectKeys.video(id),
+    queryFn: () => api.get<VideoStepDto>(`/projects/${id}/video`),
+    enabled,
   });
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  VIDEO_MODES,
   IMAGE_MODELS,
   OUTFIT_STATES,
   PRICE_MODES,
@@ -107,3 +108,34 @@ export const StoryboardGenerateSchema = InstructionSchema.extend({
 export const AssistantMessageCreateSchema = z.object({
   message: z.string().trim().min(1, 'Describe the change').max(2000),
 });
+
+// ---------- Steps 5–6 ----------
+
+export const VideoModeSchema = z.object({ mode: z.enum(VIDEO_MODES) });
+
+export const VideoJobsGenerateSchema = z.object({
+  /** Required when the jobs being replaced already have uploads. */
+  force: z.boolean().optional(),
+});
+
+export const VideoJobUpdateSchema = z.object({
+  /** A hand-edited prompt; `promptOverride: false` rebuilds it from the template. */
+  prompt: z.string().trim().min(1).optional(),
+  promptOverride: z.boolean().optional(),
+});
+export type VideoJobUpdate = z.infer<typeof VideoJobUpdateSchema>;
+
+export const ShotBoundsUpdateSchema = z.object({
+  bounds: z
+    .array(
+      z.object({
+        sceneId: z.string(),
+        start: z.number().min(0),
+        end: z.number().positive(),
+        inSec: z.number().min(0),
+        outSec: z.number().positive(),
+      }),
+    )
+    .min(1),
+});
+export type ShotBoundsUpdate = z.infer<typeof ShotBoundsUpdateSchema>;

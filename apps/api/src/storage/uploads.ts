@@ -8,9 +8,10 @@ import { StorageService } from './storage.service';
 import { StorageModule } from './storage.module';
 
 export const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 
 /** Multer writes uploads straight into DATA_DIR/tmp; handlers rename them into place. */
-export function uploadsModule() {
+export function uploadsModule(options: { maxBytes?: number; files?: number } = {}) {
   return MulterModule.registerAsync({
     imports: [StorageModule],
     inject: [StorageService],
@@ -19,7 +20,7 @@ export function uploadsModule() {
         destination: storage.tmpDir,
         filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
       }),
-      limits: { fileSize: MAX_IMAGE_BYTES, files: 30 },
+      limits: { fileSize: options.maxBytes ?? MAX_IMAGE_BYTES, files: options.files ?? 30 },
     }),
   });
 }

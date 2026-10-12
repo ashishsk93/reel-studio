@@ -1,0 +1,84 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ffmpeg builders > builds stable argument lists 1`] = `
+[
+  "-v",
+  "error",
+  "-print_format",
+  "json",
+  "-show_format",
+  "-show_streams",
+  "in.mp4",
+]
+`;
+
+exports[`ffmpeg builders > builds stable argument lists 2`] = `
+[
+  "-hide_banner",
+  "-y",
+  "-i",
+  "in.mov",
+  "-map",
+  "0:v:0",
+  "-vf",
+  "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,format=yuv420p",
+  "-c:v",
+  "libx264",
+  "-preset",
+  "veryfast",
+  "-crf",
+  "18",
+  "-an",
+  "-movflags",
+  "+faststart",
+  "out.mp4",
+]
+`;
+
+exports[`ffmpeg builders > builds stable argument lists 3`] = `
+[
+  "-hide_banner",
+  "-i",
+  "n.mp4",
+  "-vf",
+  "select='gt(scene,0.3)',metadata=print",
+  "-an",
+  "-f",
+  "null",
+  "-",
+]
+`;
+
+exports[`ffmpeg builders > builds stable argument lists 4`] = `
+[
+  "-hide_banner",
+  "-y",
+  "-i",
+  "n.mp4",
+  "-vf",
+  "select='eq(n,0)+eq(n,45)+eq(n,299)',scale=-2:640",
+  "-fps_mode",
+  "passthrough",
+  "-q:v",
+  "4",
+  "f_%03d.jpg",
+]
+`;
+
+exports[`ffmpeg builders > builds stable argument lists 5`] = `
+[
+  "-hide_banner",
+  "-y",
+  "-ss",
+  "1.500",
+  "-i",
+  "n.mp4",
+  "-frames:v",
+  "1",
+  "-vf",
+  "scale=-2:960",
+  "-q:v",
+  "3",
+  "p.jpg",
+]
+`;

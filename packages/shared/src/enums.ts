@@ -116,3 +116,10 @@ export type IssueSeverity = (typeof ISSUE_SEVERITIES)[number];
 /** Stored statuses of a character-creator frame; "locked" is derived (no anchor yet). */
 export const CREATOR_TASK_STATUSES = ['locked', 'ready', 'in_review', 'approved', 'skipped'] as const;
 export type CreatorTaskStatus = (typeof CREATOR_TASK_STATUSES)[number];
+
+/** Main jobs come from the storyboard; replacement jobs re-generate one shot as a single scene. */
+export const VIDEO_JOB_PURPOSES = ['main', 'replacement'] as const;
+export type VideoJobPurpose = (typeof VIDEO_JOB_PURPOSES)[number];
+
+export const VIDEO_FIX_KINDS = ['regenerate_shot', 'adjust_prompt'] as const;
+export type VideoFixKind = (typeof VIDEO_FIX_KINDS)[number];
