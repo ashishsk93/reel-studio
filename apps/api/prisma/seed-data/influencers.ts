@@ -38,9 +38,9 @@ export const SEED_INFLUENCERS: Array<InfluencerFields & { slug: string }> = [
     age: 23,
     city: 'Kochi, Kerala',
     identityBlock:
-      'Meera Nair, a 23-year-old Malayali woman from Kochi, Kerala. Warm medium-brown skin with natural texture, oval face with a soft rounded jaw, large dark-brown almond-shaped eyes, thick natural eyebrows, small straight nose, full lips, and a small beauty mark just above the right corner of her upper lip. Long, thick, glossy black hair to mid-back, usually in a single loose braid. Small gold jhumka earrings and a thin gold chain. Slim build, about 5\'4". Minimal natural makeup with a thin kajal line. Calm, warm, slightly shy expression. An original person, not a celebrity or real individual.',
+      'Meera Nair, a 23-year-old Malayali woman from Kochi, Kerala. Warm medium-brown skin with natural texture, oval face with a soft rounded jaw, large dark-brown almond-shaped eyes, thick natural eyebrows, small straight nose, full lips, and a small beauty mark just above the left side of her upper lip. Long, thick, glossy black hair to mid-back, usually in a single loose braid. Small gold jhumka earrings and a thin gold chain. Slim build, about 5\'4". Minimal natural makeup with a thin kajal line. Calm, warm, slightly shy expression. An original person, not a celebrity or real individual.',
     shortIdentity:
-      '23-year-old Malayali woman, warm medium-brown skin, oval face, large dark-brown almond eyes, thick natural brows, small beauty mark above the right corner of her upper lip, long glossy black hair in a single loose braid, small gold jhumkas, thin gold chain, thin kajal, calm warm expression',
+      '23-year-old Malayali woman, warm medium-brown skin, oval face, large dark-brown almond eyes, thick natural brows, small beauty mark just above the left side of her upper lip, long glossy black hair in a single loose braid, small gold jhumkas, thin gold chain, thin kajal, calm warm expression',
     voiceNotes: 'Warm, observant, gentle. Notices small details and says them simply.',
     // Placeholder lines (not in the brief); edit in the UI.
     exampleLines: ['Monsoon-ready and still pretty 🌧️', 'Kasavu, but make it everyday'],
@@ -48,7 +48,7 @@ export const SEED_INFLUENCERS: Array<InfluencerFields & { slug: string }> = [
     lane: 'Kerala-modern: cotton, kasavu, monsoon-friendly; Onam and Vishu.',
     hashtag: '#MeeraWears',
     signatureDetails: [
-      'small beauty mark just above the right corner of her upper lip',
+      'small beauty mark just above the left side of her upper lip',
       'long hair in a single loose braid',
       'small gold jhumka earrings and a thin gold chain',
       'thin kajal line',
