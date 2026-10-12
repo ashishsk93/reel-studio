@@ -172,6 +172,52 @@ export class InfluencersService {
     await this.storage.remove(ref.path);
   }
 
+  /**
+   * Character creator: an approved frame becomes a tagged reference. The file is copied, so
+   * deleting the upload later keeps the reference. Re-approving a frame replaces its reference.
+   */
+  async promoteToReference(input: {
+    influencerId: string;
+    sourcePath: string;
+    width: number;
+    height: number;
+    tag: RefTag;
+    creatorTaskId: string;
+    note: string;
+  }): Promise<ReferenceImageDto> {
+    await this.removeCreatorReference(input.creatorTaskId);
+    if (input.tag === 'anchor') await this.stripTag(input.influencerId, 'anchor');
+    const dot = input.sourcePath.lastIndexOf('.');
+    const rel = `influencers/${input.influencerId}/refs/${randomUUID()}${dot >= 0 ? input.sourcePath.slice(dot) : '.jpg'}`;
+    await this.storage.copyInto(input.sourcePath, rel);
+    const order = await this.prisma.referenceImage.aggregate({
+      where: { influencerId: input.influencerId },
+      _max: { sortOrder: true },
+      _min: { sortOrder: true },
+    });
+    const ref = await this.prisma.referenceImage.create({
+      data: {
+        influencerId: input.influencerId,
+        path: rel,
+        width: input.width,
+        height: input.height,
+        tags: toJson([input.tag]),
+        note: input.note,
+        // The anchor goes first in the gallery; everything else is appended.
+        sortOrder: input.tag === 'anchor' ? (order._min.sortOrder ?? 0) - 1 : (order._max.sortOrder ?? -1) + 1,
+        creatorTaskId: input.creatorTaskId,
+      },
+    });
+    return toReferenceDto(ref, this.storage);
+  }
+
+  async removeCreatorReference(creatorTaskId: string): Promise<void> {
+    const previous = await this.prisma.referenceImage.findUnique({ where: { creatorTaskId } });
+    if (!previous) return;
+    await this.prisma.referenceImage.delete({ where: { id: previous.id } });
+    await this.storage.remove(previous.path);
+  }
+
   async samplePrompt(id: string): Promise<PromptCardDto> {
     const influencer = await this.find(id);
     const [rules, tools] = await Promise.all([this.settings.get('storyboard.refRules'), this.settings.get('tools.image')]);

@@ -101,3 +101,9 @@ export const StoryboardGenerateSchema = InstructionSchema.extend({
   /** Required when existing scenes already have uploads. */
   force: z.boolean().optional(),
 });
+
+// ---------- Step 4 ----------
+
+export const AssistantMessageCreateSchema = z.object({
+  message: z.string().trim().min(1, 'Describe the change').max(2000),
+});

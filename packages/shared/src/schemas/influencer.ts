@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { INFLUENCER_STATUSES, REF_TAGS } from '../enums.js';
+import { IMAGE_MODELS, INFLUENCER_STATUSES, REF_TAGS } from '../enums.js';
 
 const text = z.string().trim();
 const required = text.min(1, 'Required');
@@ -99,3 +99,12 @@ export const PersonaRegenerateSchema = z.object({
   instruction: z.string().trim().optional(),
 });
 export type PersonaRegenerate = z.infer<typeof PersonaRegenerateSchema>;
+
+/** Character creator frame edits. A hand-edited prompt sets promptOverride; false rebuilds it. */
+export const CreatorTaskUpdateSchema = z.object({
+  prompt: z.string().trim().min(1).optional(),
+  promptOverride: z.boolean().optional(),
+  status: z.enum(['ready', 'skipped']).optional(),
+  imageModel: z.enum(IMAGE_MODELS).optional(),
+});
+export type CreatorTaskUpdate = z.infer<typeof CreatorTaskUpdateSchema>;

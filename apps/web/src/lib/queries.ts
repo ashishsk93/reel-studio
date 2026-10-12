@@ -2,7 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type {
+  AssistantMessageDto,
+  CreatorTaskDto,
+  ImagesStepDto,
   InfluencerDetailDto,
+  SettingKey,
+  SettingValue,
   InfluencerDto,
   ProductSpecDto,
   ProjectDto,
@@ -10,6 +15,7 @@ import type {
   SourceDto,
   StoryboardDto,
 } from "@reel/shared";
+import { SETTINGS } from "@reel/shared";
 import { api } from "./api";
 
 export const keys = {
@@ -37,6 +43,16 @@ export const projectKeys = {
   one: (id: string) => ["projects", id] as const,
   spec: (id: string) => ["projects", id, "spec"] as const,
   storyboard: (id: string) => ["projects", id, "storyboard"] as const,
+  images: (id: string) => ["projects", id, "images"] as const,
+};
+
+/** Under the influencer's key, so every influencer invalidation refreshes the plan too. */
+export const creatorKeys = {
+  tasks: (influencerId: string) => ["influencers", influencerId, "creator"] as const,
+};
+
+export const assistantKeys = {
+  messages: (assetId: string) => ["assets", assetId, "assistant"] as const,
 };
 
 export function useProjects() {
@@ -59,5 +75,37 @@ export function useStoryboard(id: string, enabled = true) {
     queryKey: projectKeys.storyboard(id),
     queryFn: () => api.get<StoryboardDto>(`/projects/${id}/storyboard`),
     enabled,
+  });
+}
+
+export function useImagesStep(id: string, enabled = true) {
+  return useQuery({
+    queryKey: projectKeys.images(id),
+    queryFn: () => api.get<ImagesStepDto>(`/projects/${id}/images`),
+    enabled,
+  });
+}
+
+export function useCreatorTasks(influencerId: string) {
+  return useQuery({
+    queryKey: creatorKeys.tasks(influencerId),
+    queryFn: () => api.get<CreatorTaskDto[]>(`/influencers/${influencerId}/creator/tasks`),
+  });
+}
+
+export function useAssistantMessages(assetId: string, enabled = true) {
+  return useQuery({
+    queryKey: assistantKeys.messages(assetId),
+    queryFn: () => api.get<AssistantMessageDto[]>(`/assets/${assetId}/assistant`),
+    enabled,
+  });
+}
+
+/** One setting's value (shares the settings page's query). */
+export function useSetting<K extends SettingKey>(key: K) {
+  return useQuery({
+    queryKey: keys.settings,
+    queryFn: () => api.get<Array<{ key: SettingKey; value: unknown }>>("/settings"),
+    select: (rows) => (rows.find((r) => r.key === key)?.value ?? SETTINGS[key].default) as SettingValue<K>,
   });
 }

@@ -69,18 +69,19 @@ model ReferenceImage {
 
 // One step in a new character's reference-image plan (anchor first, then the rest)
 model CreatorTask {
-  id           String   @id @default(cuid())
-  influencerId String
-  order        Int
-  tag          String
-  purpose      String
-  prompt       String
-  imageModel   String
-  modelReason  String
-  attachments  Json // AttachmentRef[]
-  status       String   @default("locked") // locked | ready | in_review | approved | skipped
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  influencerId   String
+  order          Int
+  tag            String
+  purpose        String
+  prompt         String
+  promptOverride Boolean  @default(false) // prompt edited by hand or rewritten by Claude; don't rebuild
+  imageModel     String
+  modelReason    String
+  attachments    Json // AttachmentRef[]
+  status         String   @default("locked") // locked | ready | in_review | approved | skipped
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   influencer Influencer      @relation(fields: [influencerId], references: [id], onDelete: Cascade)
   assets     Asset[]
@@ -237,6 +238,7 @@ model Review {
   id         String   @id @default(cuid())
   assetId    String
   verdict    String // pass | warn | fail
+  summary    String   @default("")
   checklist  Json
   issues     Json
   fixPrompts Json

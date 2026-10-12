@@ -1,0 +1,30 @@
+{
+  "output": {
+    "verdict": "warn",
+    "summary": "A clean, sharp reference, but her hair is longer than in the anchor and the left hand has an extra finger.",
+    "identity": [
+      { "item": "Face match with the anchor", "result": "match", "note": "" },
+      { "item": "Age look", "result": "match", "note": "" },
+      { "item": "Hair", "result": "partial", "note": "Reaches mid-back; the anchor shows shoulder length" }
+    ],
+    "garment": [],
+    "anatomy": [{ "item": "Hands and fingers", "result": "mismatch", "note": "Six fingers on the left hand" }],
+    "artefacts": [{ "item": "Text and watermarks", "result": "match", "note": "" }],
+    "composition": [{ "item": "Requested view and framing", "result": "match", "note": "" }],
+    "faceBox": { "x": 0.42, "y": 0.08, "w": 0.16, "h": 0.1 },
+    "issues": [
+      { "severity": "major", "description": "Six fingers on her left hand", "region": { "x": 0.25, "y": 0.45, "w": 0.1, "h": 0.08 } },
+      { "severity": "minor", "description": "Hair noticeably longer than in the anchor", "region": null }
+    ],
+    "fixes": [
+      {
+        "title": "Fix the left hand",
+        "instruction": "Redraw her left hand with five natural fingers, relaxed at her side.",
+        "keep": "Everything else: her face, hair, pose, outfit, background and lighting.",
+        "attach": [],
+        "tool": "gpt_image",
+        "checkAfter": ["Five fingers on each hand", "The hand looks natural at her side"]
+      }
+    ]
+  }
+}

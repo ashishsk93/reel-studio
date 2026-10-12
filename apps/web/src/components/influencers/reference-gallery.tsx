@@ -22,7 +22,7 @@ import {
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const TAG_LABEL: Record<RefTag, string> = {
+export const TAG_LABEL: Record<RefTag, string> = {
   anchor: "anchor",
   turnaround: "turnaround",
   base_front: "base front",

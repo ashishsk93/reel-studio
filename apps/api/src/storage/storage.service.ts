@@ -46,6 +46,17 @@ export class StorageService implements OnModuleInit {
     return `${this.apiOrigin}/api/files/${rel.split('/').map(encodeURIComponent).join('/')}`;
   }
 
+  /** Absolute URL of an API route, e.g. apiUrl('/scenes/x/attachments.zip'). */
+  apiUrl(route: string): string {
+    return `${this.apiOrigin}/api${route}`;
+  }
+
+  async copyInto(srcRel: string, destRel: string): Promise<string> {
+    const tmp = this.tmpPath(path.extname(destRel));
+    await fs.copyFile(this.abs(srcRel), tmp);
+    return this.moveInto(tmp, destRel);
+  }
+
   tmpPath(ext = ''): string {
     return path.join(this.tmpDir, `${randomUUID()}${ext}`);
   }

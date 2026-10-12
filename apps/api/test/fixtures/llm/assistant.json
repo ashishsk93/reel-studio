@@ -1,0 +1,13 @@
+{
+  "output": {
+    "reply": "This keeps everything as it is and only changes the background to a rooftop at night with warm string lights.",
+    "edit": {
+      "title": "Rooftop at night",
+      "instruction": "Replace the background with an open rooftop terrace at night: warm string lights overhead, a softly blurred city skyline behind her, and gentle warm light on her face and outfit that matches the new setting.",
+      "keep": "Her face, hair, expression, pose, the outfit and its colours, the framing and the camera angle.",
+      "attach": ["anchor"],
+      "tool": "gpt_image",
+      "checkAfter": ["Her face still matches the anchor", "The outfit colour hasn't shifted under the warm light", "No text or signs in the skyline"]
+    }
+  }
+}

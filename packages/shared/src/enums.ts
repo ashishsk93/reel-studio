@@ -78,6 +78,8 @@ export const LLM_TASKS = [
   'storyboard',
   'scene_prompt',
   'image_review',
+  'reference_review',
+  'creator_prompt',
   'video_review',
   'video_prompts',
   'assistant',
@@ -100,3 +102,17 @@ export type ShotKind = (typeof SHOT_KINDS)[number];
 
 export const TRANSPARENCY = ['opaque', 'semi_sheer', 'sheer'] as const;
 export type Transparency = (typeof TRANSPARENCY)[number];
+
+/** Review checklist groups. `framing` is used for character reference frames. */
+export const CHECK_GROUPS = ['identity', 'garment', 'anatomy', 'artefacts', 'composition', 'framing'] as const;
+export type CheckGroup = (typeof CHECK_GROUPS)[number];
+
+export const CHECK_RESULTS = ['match', 'partial', 'mismatch'] as const;
+export type CheckResult = (typeof CHECK_RESULTS)[number];
+
+export const ISSUE_SEVERITIES = ['minor', 'major', 'critical'] as const;
+export type IssueSeverity = (typeof ISSUE_SEVERITIES)[number];
+
+/** Stored statuses of a character-creator frame; "locked" is derived (no anchor yet). */
+export const CREATOR_TASK_STATUSES = ['locked', 'ready', 'in_review', 'approved', 'skipped'] as const;
+export type CreatorTaskStatus = (typeof CREATOR_TASK_STATUSES)[number];

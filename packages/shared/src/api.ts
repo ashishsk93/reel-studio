@@ -1,5 +1,10 @@
 import type {
+  AssetStatus,
+  CheckGroup,
+  CheckResult,
+  CreatorTaskStatus,
   ImageModel,
+  IssueSeverity,
   InfluencerStatus,
   JobStatus,
   LlmTask,
@@ -11,8 +16,10 @@ import type {
   SceneType,
   ShotKind,
   SourceKey,
+  Verdict,
   VideoMode,
 } from './enums.js';
+import type { Box } from './llm/review.js';
 import type { MustMatchItem, ProductSpec } from './llm/product.js';
 import type { ConditionalFeature } from './schemas/influencer.js';
 
@@ -227,6 +234,95 @@ export interface HealthDto {
   dataDir: string;
   modelDefault: string;
   modelReview: string;
+}
+
+// ---------- Step 4: generated images, reviews, assistant ----------
+
+export interface ChecklistItemDto {
+  group: CheckGroup;
+  item: string;
+  result: CheckResult;
+  note: string;
+}
+
+export interface ReviewIssueDto {
+  severity: IssueSeverity;
+  description: string;
+  region: Box | null;
+}
+
+/** A paste-ready edit prompt (review fix or assistant answer) with its ordered attachments. */
+export interface EditPromptDto {
+  title: string;
+  tool: ImageModel;
+  card: PromptCardDto;
+  checkAfter: string[];
+  zipUrl: string;
+}
+
+export interface ReviewDto {
+  id: string;
+  assetId: string;
+  verdict: Verdict;
+  summary: string;
+  checklist: ChecklistItemDto[];
+  issues: ReviewIssueDto[];
+  fixes: EditPromptDto[];
+  model: string;
+  createdAt: string;
+}
+
+export interface AssetDto {
+  id: string;
+  kind: 'image' | 'video';
+  version: number;
+  url: string;
+  width: number;
+  height: number;
+  status: AssetStatus;
+  createdAt: string;
+  review: ReviewDto | null;
+  /** The latest review job when it is queued, running or failed. */
+  reviewJob: { id: string; status: JobStatus; error: string | null } | null;
+}
+
+export interface SceneImagesDto {
+  scene: SceneDto;
+  assets: AssetDto[];
+  approvedAssetId: string | null;
+}
+
+export interface ImagesStepDto {
+  scenes: SceneImagesDto[];
+  approved: number;
+  total: number;
+}
+
+export interface AssistantMessageDto {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  edit: EditPromptDto | null;
+  createdAt: string;
+}
+
+export interface CreatorTaskDto {
+  id: string;
+  influencerId: string;
+  order: number;
+  tag: RefTag;
+  purpose: string;
+  /** "locked" until the anchor is approved (except for the anchor itself). */
+  status: CreatorTaskStatus;
+  imageModel: ImageModel;
+  modelReason: string;
+  aspect: string;
+  tips: string[];
+  promptOverride: boolean;
+  card: PromptCardDto;
+  /** The reference image this frame produced (or one already tagged with it). */
+  reference: ReferenceImageDto | null;
+  assets: AssetDto[];
 }
 
 export interface ApiErrorBody {

@@ -130,10 +130,11 @@ export class StoryboardService implements OnModuleInit {
     };
   }
 
-  async sceneAttachments(sceneId: string): Promise<{ scene: Scene; attachments: SelectedAttachment[] }> {
+  /** The scene with its current prompt and attachments (rebuilt, so new references count). */
+  async sceneAttachments(sceneId: string): Promise<{ scene: Scene } & BuiltScene> {
     const scene = await this.findScene(sceneId);
     const ctx = await this.context(scene.projectId);
-    return { scene, attachments: this.build(ctx, scene).attachments };
+    return { scene, ...this.build(ctx, scene) };
   }
 
   async allAttachments(projectId: string) {
@@ -201,6 +202,7 @@ export class StoryboardService implements OnModuleInit {
       const rest = await tx.scene.findMany({ where: { projectId: scene.projectId }, orderBy: { order: 'asc' } });
       for (const [order, s] of rest.entries()) await tx.scene.update({ where: { id: s.id }, data: { order } });
     });
+    await this.storage.removeDir(`projects/${scene.projectId}/scenes/${sceneId}`);
   }
 
   async reorder(projectId: string, ids: string[]): Promise<StoryboardDto> {
@@ -244,6 +246,7 @@ export class StoryboardService implements OnModuleInit {
 
     const scenes = result.data.scenes;
     const built = scenes.map((scene) => this.buildFromFields(ctx, scene));
+    const replaced = await this.prisma.scene.findMany({ where: { projectId }, select: { id: true } });
     await this.prisma.$transaction(async (tx) => {
       await tx.scene.deleteMany({ where: { projectId } });
       for (const [order, scene] of scenes.entries()) {
@@ -251,6 +254,8 @@ export class StoryboardService implements OnModuleInit {
       }
       await tx.project.update({ where: { id: projectId }, data: { storyboardNotes: toJson(result.data.notes) } });
     });
+    // Uploads of the replaced scenes were deleted with them (the user confirmed); remove their files too.
+    for (const { id } of replaced) await this.storage.removeDir(`projects/${projectId}/scenes/${id}`);
     return scenes.length;
   }
 

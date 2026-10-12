@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ImageOff, TriangleAlert } from "lucide-react";
 import type { PromptCardDto } from "@reel/shared";
 import { CopyButton } from "@/components/copy-button";
+import { cn } from "@/lib/utils";
 
 /** Copy-ready prompt with its ordered attachments. */
 export function PromptCard({
@@ -11,11 +12,14 @@ export function PromptCard({
   title,
   chips,
   footer,
+  compact,
 }: {
   card: PromptCardDto;
   title?: ReactNode;
   chips?: ReactNode;
   footer?: ReactNode;
+  /** Smaller thumbnails and prompt box, for fixes and assistant answers. */
+  compact?: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
@@ -24,10 +28,15 @@ export function PromptCard({
           {title && <h3 className="text-sm font-semibold">{title}</h3>}
           {chips}
         </div>
-        <CopyButton text={card.prompt} label="Copy prompt" size="lg" />
+        <CopyButton text={card.prompt} label="Copy prompt" size={compact ? "sm" : "lg"} />
       </div>
 
-      <pre className="max-h-80 overflow-auto bg-muted/40 px-4 py-3 font-mono text-[13px] leading-relaxed whitespace-pre-wrap">
+      <pre
+        className={cn(
+          "overflow-auto bg-muted/40 px-4 py-3 font-mono leading-relaxed whitespace-pre-wrap",
+          compact ? "max-h-48 text-xs" : "max-h-80 text-[13px]",
+        )}
+      >
         {card.prompt}
       </pre>
 
@@ -35,7 +44,7 @@ export function PromptCard({
         <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Attach in this order</p>
         <ol className="flex flex-wrap gap-3">
           {card.attachments.map((a) => (
-            <li key={`${a.index}-${a.id}`} className="w-28">
+            <li key={`${a.index}-${a.id}`} className={compact ? "w-16" : "w-28"}>
               <div className="relative aspect-[9/16] overflow-hidden rounded-lg border bg-muted">
                 {a.url ? (
                   // eslint-disable-next-line @next/next/no-img-element

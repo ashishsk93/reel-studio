@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PersonaForm, pickPersona, type PersonaDraft } from "@/components/influencers/persona-form";
+import { CreatorPlan } from "@/components/influencers/creator-plan";
 import { ReferenceGallery } from "@/components/influencers/reference-gallery";
 import { PromptCard } from "@/components/prompt-card";
 import { ApiError, api, errorMessage } from "@/lib/api";
@@ -146,7 +147,8 @@ function InfluencerDetail() {
 
       {influencer.status === "draft" && !influencer.anchor && (
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
-          Draft. Review the persona, then upload her <strong>anchor</strong> image under References to activate her.
+          Draft. Review the persona, then generate her <strong>anchor</strong> from the <strong>Reference plan</strong> tab (or
+          upload an existing one under References) to activate her.
         </div>
       )}
 
@@ -154,6 +156,7 @@ function InfluencerDetail() {
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="references">References ({influencer.references.length})</TabsTrigger>
+          <TabsTrigger value="plan">Reference plan</TabsTrigger>
           <TabsTrigger value="test">Test prompt</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
@@ -161,6 +164,9 @@ function InfluencerDetail() {
         </TabsContent>
         <TabsContent value="references">
           <ReferenceGallery influencer={influencer} />
+        </TabsContent>
+        <TabsContent value="plan">
+          <CreatorPlan influencer={influencer} />
         </TabsContent>
         <TabsContent value="test">
           <TestPromptTab influencer={influencer} />

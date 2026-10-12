@@ -142,3 +142,25 @@ export function useProjectJobs(projectId: string) {
     };
   }, [data]);
 }
+
+/**
+ * Refetches `queryKey` whenever a job of one of `types` finishes (success or failure), e.g.
+ * review jobs started by an upload that nobody is watching with a toast.
+ */
+export function useJobRefresh(types: readonly string[], queryKey: readonly unknown[]) {
+  const events = useContext(JobEventsContext);
+  const queryClient = useQueryClient();
+  const typeKey = types.join("|");
+  const keyJson = JSON.stringify(queryKey);
+
+  useEffect(() => {
+    if (!events) return;
+    const wanted = new Set(typeKey.split("|"));
+    const key = JSON.parse(keyJson) as unknown[];
+    return events.subscribe((job) => {
+      if (wanted.has(job.type) && (FINAL.has(job.status) || job.status === "running")) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    });
+  }, [events, queryClient, typeKey, keyJson]);
+}
