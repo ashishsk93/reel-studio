@@ -17,9 +17,11 @@ The brief is in [docs/reel_studio_claude_code_prompt.md](docs/reel_studio_claude
 
 ## Setup
 
-Requirements: **Node 22.12+**, **pnpm 10**, **FFmpeg + ffprobe** on your PATH.
+Requirements: **Node 22.12+** (`.nvmrc`), **pnpm 10** (`corepack enable`), **FFmpeg + ffprobe** on your PATH.
 
 ```bash
+git clone https://github.com/ashishsk93/reel-studio.git
+cd reel-studio
 pnpm i
 cp .env.example .env        # then fill in ANTHROPIC_API_KEY
 pnpm db:migrate             # creates data/app.db
@@ -29,6 +31,8 @@ pnpm dev                    # API on :4000, web on :3000
 ```
 
 Open http://localhost:3000.
+
+Not in the repository (git-ignored), so a fresh clone needs them: `.env` (your key), `data/` (database, uploads, renders), the fonts below, and the MediaPipe models (`pnpm --filter @reel/web mediapipe`). Back up `data/` yourself; it holds every project.
 
 ### `.env`
 
@@ -146,6 +150,7 @@ data/           DATA_DIR (git-ignored): app.db, uploads, logs/
 pnpm dev          # shared (watch) + API (watch) + web
 pnpm test         # vitest in packages/shared and apps/api (includes a real FFmpeg render of 3 bundled clips)
 pnpm typecheck
+pnpm lint
 pnpm build
 pnpm db:migrate   # prisma migrate dev
 pnpm db:seed      # idempotent: never overwrites edits made in the UI
