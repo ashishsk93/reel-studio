@@ -19,6 +19,7 @@ import { API_URL, api, errorMessage } from "@/lib/api";
 import { useJobRefresh, useJobWatcher } from "@/lib/jobs";
 import { useCreatorTasks } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 const STATUS: Record<CreatorTaskStatus, { label: string; icon: typeof Circle; className: string }> = {
   locked: { label: "Locked", icon: Lock, className: "text-muted-foreground" },
@@ -171,8 +172,10 @@ function FrameDetail({ task, influencer }: { task: CreatorTaskDto; influencer: I
 
       {task.reference && (
         <div className="flex items-center gap-3 rounded-xl border bg-card p-3 text-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={task.reference.url} alt="" className="h-16 w-12 rounded-md border object-cover" />
+          <Expandable items={[{ url: task.reference.url, label: task.tag }]}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={task.reference.url} alt="" className="h-16 w-12 rounded-md border object-cover" />
+          </Expandable>
           <p>
             <span className="font-medium">In her references.</span>{" "}
             <span className="text-muted-foreground">

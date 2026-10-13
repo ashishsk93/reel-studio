@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { JobEventsProvider } from "@/lib/jobs";
+import { LightboxProvider } from "@/components/lightbox";
 
 let browserQueryClient: QueryClient | undefined;
 
@@ -24,7 +25,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider>
       <QueryClientProvider client={getQueryClient()}>
         <JobEventsProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <LightboxProvider>{children}</LightboxProvider>
+          </TooltipProvider>
           <Toaster richColors closeButton position="bottom-right" />
         </JobEventsProvider>
       </QueryClientProvider>

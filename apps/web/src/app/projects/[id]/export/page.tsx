@@ -16,6 +16,7 @@ import { api, errorMessage } from "@/lib/api";
 import { useJobRefresh, useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useComposeStep, useProject, useRenders } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(n / 1024)} KB`);
 
@@ -127,7 +128,11 @@ function RenderView({
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="flex flex-col gap-3">
-        {video && <video src={video.url} controls playsInline className="aspect-[9/16] w-full rounded-2xl border bg-black" />}
+        {video && (
+          <Expandable items={[{ url: video.url, kind: "video", label: "final.mp4" }]} button>
+            <video src={video.url} controls playsInline className="aspect-[9/16] w-full rounded-2xl border bg-black" />
+          </Expandable>
+        )}
         <p className="text-center text-xs text-muted-foreground">
           Rendered {new Date(render.finishedAt ?? render.createdAt).toLocaleString()} · {render.durationSec}s
         </p>
@@ -197,8 +202,10 @@ function RenderView({
               ))}
             </ul>
             {render.qa.contactSheetUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={render.qa.contactSheetUrl} alt="Contact sheet" className="mt-4 w-full max-w-2xl rounded-lg border" />
+              <Expandable items={[{ url: render.qa.contactSheetUrl, label: "Contact sheet" }]} className="mt-4 w-full max-w-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={render.qa.contactSheetUrl} alt="Contact sheet" className="w-full rounded-lg border" />
+              </Expandable>
             )}
           </section>
         )}

@@ -5,6 +5,7 @@ import { ImageOff, TriangleAlert } from "lucide-react";
 import type { PromptCardDto } from "@reel/shared";
 import { CopyButton } from "@/components/copy-button";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 /** Copy-ready prompt with its ordered attachments. */
 export function PromptCard({
@@ -47,8 +48,14 @@ export function PromptCard({
             <li key={`${a.index}-${a.id}`} className={compact ? "w-16" : "w-28"}>
               <div className="relative aspect-[9/16] overflow-hidden rounded-lg border bg-muted">
                 {a.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.url} alt={a.label} className="size-full object-cover" />
+                  <Expandable
+                    items={card.attachments.filter((x) => x.url).map((x) => ({ url: x.url!, label: `${x.index}. ${x.label}` }))}
+                    index={card.attachments.filter((x) => x.url).findIndex((x) => x.id === a.id && x.index === a.index)}
+                    className="size-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a.url} alt={a.label} className="size-full object-cover" />
+                  </Expandable>
                 ) : (
                   <div className="flex size-full items-center justify-center text-muted-foreground">
                     <ImageOff className="size-5" />

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 export const TAG_LABEL: Record<RefTag, string> = {
   anchor: "anchor",
@@ -249,7 +250,7 @@ function ReferenceCard({ reference, influencerId }: { reference: ReferenceImageD
 
   return (
     <div className="group overflow-hidden rounded-xl border bg-card" data-influencer={influencerId}>
-      <a href={reference.url} target="_blank" rel="noreferrer" className="relative block aspect-[3/4] bg-muted">
+      <Expandable items={[{ url: reference.url, label: reference.tags.join(", ") || "Reference" }]} className="relative block aspect-[3/4] bg-muted">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={reference.url} alt={reference.tags.join(", ")} className="size-full object-cover" loading="lazy" />
         {reference.tags.includes("anchor") && (
@@ -257,7 +258,7 @@ function ReferenceCard({ reference, influencerId }: { reference: ReferenceImageD
             Anchor
           </span>
         )}
-      </a>
+      </Expandable>
       <div className="flex flex-col gap-2 p-3">
         {editing ? (
           <>

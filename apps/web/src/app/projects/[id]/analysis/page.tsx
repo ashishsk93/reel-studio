@@ -21,6 +21,7 @@ import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useProject, useSpec } from "@/lib/queries";
 import { useSyncedState } from "@/lib/hooks";
+import { Expandable } from "@/components/lightbox";
 
 const ANALYZE = "product.analyze";
 const PARAGRAPH = "product.paragraph";
@@ -240,12 +241,12 @@ function SpecView({
         <aside className="flex flex-col gap-2 self-start lg:sticky lg:top-6">
           <p className="text-xs font-medium text-muted-foreground">Product photos</p>
           <div className="grid grid-cols-3 gap-2 lg:grid-cols-2">
-            {images.map((im) => (
-              <a key={im.id} href={im.url} target="_blank" rel="noreferrer" className="relative overflow-hidden rounded-lg border">
+            {images.map((im, i) => (
+              <Expandable key={im.id} items={images.map((x) => ({ url: x.url, label: x.role }))} index={i} className="relative overflow-hidden rounded-lg border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.url} alt={im.role} className="aspect-[3/4] w-full object-cover" />
                 <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1.5 text-[10px]">{im.role}</span>
-              </a>
+              </Expandable>
             ))}
           </div>
         </aside>

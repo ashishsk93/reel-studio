@@ -1,10 +1,22 @@
-﻿{
+{
   "version": "0.0.1",
   "configurations": [
     {
       "name": "reel-studio",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": [
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "web-only",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@reel/web",
+        "dev"
+      ],
       "port": 3000
     }
   ]

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { VERDICT_STYLE } from "@/components/assets/review-card";
 import { API_URL, ApiError, api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 const FPS = 30;
 const MIN_SHOT = 0.3;
@@ -195,6 +196,7 @@ export function TimelineEditor({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start gap-4">
+        <Expandable items={[{ url: asset.url, kind: "video", label: `Version ${asset.version}` }]} button>
         <video
           ref={videoRef}
           src={asset.normalizedUrl ?? asset.url}
@@ -209,11 +211,14 @@ export function TimelineEditor({
           }}
           onSeeked={() => setTime(videoRef.current?.currentTime ?? 0)}
         />
+        </Expandable>
         <div className="flex min-w-48 flex-1 flex-col gap-2">
           <p className="text-xs font-medium text-muted-foreground">Exact frame{preview !== null && ` at ${fmt(preview)} s (frame ${Math.round(preview * FPS)})`}</p>
           {previewSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewSrc} alt="Exact frame" className="max-h-[40vh] w-auto max-w-[220px] rounded-lg border bg-black" />
+            <Expandable items={[{ url: previewSrc, label: "Exact frame" }]}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewSrc} alt="Exact frame" className="max-h-[40vh] w-auto max-w-[220px] rounded-lg border bg-black" />
+            </Expandable>
           ) : (
             <p className="max-w-56 text-xs text-muted-foreground">Drag a cut or an in/out handle to see the exact frame it lands on.</p>
           )}

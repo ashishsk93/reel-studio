@@ -18,6 +18,7 @@ import { api, errorMessage } from "@/lib/api";
 import { useJobWatcher } from "@/lib/jobs";
 import { projectKeys } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { Expandable } from "@/components/lightbox";
 
 type Props = { projectId: string; step: ComposeStepDto; setData: (d: ComposeStepDto) => void };
 
@@ -129,8 +130,10 @@ export function CtaPanel({ projectId, step, setData }: Props) {
         </div>
       </div>
       <div className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={step.ctaPreviewUrl} alt="End card preview" className="aspect-[9/16] w-[300px] rounded-2xl border bg-black object-cover" />
+        <Expandable items={[{ url: step.ctaPreviewUrl, label: "End card preview" }]}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={step.ctaPreviewUrl} alt="End card preview" className="aspect-[9/16] w-[300px] rounded-2xl border bg-black object-cover" />
+        </Expandable>
         <p className="text-center text-xs text-muted-foreground">Still preview; the render adds the zoom and the bouncing pointer.</p>
       </div>
     </div>
@@ -198,8 +201,10 @@ export function CoverPanel({ projectId, step, setData }: Props) {
                 )}
                 title={c.label}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.url} alt={c.label} className="size-full object-cover" />
+                <Expandable items={cover.candidates.map((x) => ({ url: x.url, label: x.label }))} index={i} button className="size-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.url} alt={c.label} className="size-full object-cover" />
+                </Expandable>
                 {cover.best === i && <Badge className="absolute top-1 left-1 text-[10px]">Best</Badge>}
                 <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[10px] text-white">
                   {SCENE_LABEL[c.label.match(/\((\w+)\)/)?.[1] ?? ""] ?? c.label}
@@ -227,8 +232,10 @@ export function CoverPanel({ projectId, step, setData }: Props) {
               ].map((c) => (
                 <figure key={c.label} className="flex flex-col items-center gap-1">
                   {c.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.url} alt={c.label} className="aspect-[9/16] w-44 rounded-xl border object-cover" />
+                    <Expandable items={[{ url: c.url, label: c.label }]}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.url} alt={c.label} className="aspect-[9/16] w-44 rounded-xl border object-cover" />
+                    </Expandable>
                   ) : (
                     <div className="flex aspect-[9/16] w-44 items-center justify-center rounded-xl border border-dashed text-xs text-muted-foreground">
                       not rendered

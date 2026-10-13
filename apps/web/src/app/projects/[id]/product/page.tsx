@@ -26,6 +26,7 @@ import { ProductImageDropzone, RoleSelect, type PendingImage } from "@/component
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { projectKeys, useInfluencers, useProject, useSources, useSpec } from "@/lib/queries";
 import { useSyncedState } from "@/lib/hooks";
+import { Expandable } from "@/components/lightbox";
 
 function pick(p: ProjectDto) {
   return {
@@ -105,8 +106,10 @@ function ImagesCard({ project }: { project: ProjectDto }) {
         {project.productImages.map((image, i) => (
           <div key={image.id} className="flex flex-col gap-1.5">
             <div className="group relative aspect-[3/4] overflow-hidden rounded-lg border bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.url} alt={image.role} className="size-full object-cover" />
+              <Expandable items={project.productImages.map((p) => ({ url: p.url, label: p.role }))} index={i} className="size-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={image.url} alt={image.role} className="size-full object-cover" />
+              </Expandable>
               <div className="absolute inset-x-1 top-1 flex justify-between opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="flex gap-1">
                   <Button size="icon-xs" variant="secondary" aria-label="Move earlier" disabled={i === 0} onClick={() => move(i, -1)}>

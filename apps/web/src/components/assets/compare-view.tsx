@@ -5,6 +5,7 @@ import { ImageOff } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useLightbox } from "@/components/lightbox";
 
 export interface CompareImage {
   label: string;
@@ -13,6 +14,7 @@ export interface CompareImage {
 
 /** Hover to magnify around the cursor. */
 export function ZoomImage({ src, alt, zoom = 2.5, className, children }: { src: string; alt: string; zoom?: number; className?: string; children?: ReactNode }) {
+  const lightbox = useLightbox();
   const [origin, setOrigin] = useState<string | null>(null);
   const move = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -20,9 +22,11 @@ export function ZoomImage({ src, alt, zoom = 2.5, className, children }: { src: 
   };
   return (
     <div
-      className={cn("relative overflow-hidden", className)}
+      className={cn("relative cursor-zoom-in overflow-hidden", className)}
       onMouseMove={zoom > 1 ? move : undefined}
       onMouseLeave={() => setOrigin(null)}
+      onClick={() => lightbox.open([{ url: src, label: alt }])}
+      title="Click to view full screen"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
