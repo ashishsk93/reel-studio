@@ -3,15 +3,16 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
-import { ProjectFieldsSchema, type JobDto, type PriceMode, type ProjectDto } from "@reel/shared";
+import { FORMATS, ProductFieldsSchema, ProjectFieldsSchema, type JobDto, type ProjectDto, type StoryFormat } from "@reel/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, PageHeader } from "@/components/page-header";
-import { InfluencerPicker, PriceModeField, SourcePicker } from "@/components/projects/pickers";
+import { InfluencerPicker } from "@/components/projects/pickers";
 import { ProductImageDropzone, type PendingImage } from "@/components/projects/product-image-dropzone";
+import { FormatPicker, ProductFields, emptyProduct, type ProductDraft } from "@/components/projects/product-fields";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher } from "@/lib/jobs";
 import { projectKeys, useInfluencers, useSources } from "@/lib/queries";
@@ -28,6 +29,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
+type ProductEntry = { key: number; images: PendingImage[]; fields: ProductDraft };
+
 export default function NewProjectPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -35,57 +38,78 @@ export default function NewProjectPage() {
   const influencers = useInfluencers();
   const sources = useSources();
 
-  const [images, setImages] = useState<PendingImage[]>([]);
-  const [form, setForm] = useState({
-    influencerId: "",
-    sourceId: "",
-    productTitle: "",
-    priceInr: "",
-    productUrl: "",
-    affiliateLink: "",
-    occasion: "",
-  });
-  const [override, setOverride] = useState<PriceMode | null>(null);
+  const [format, setFormat] = useState<StoryFormat>("classic");
+  const [form, setForm] = useState({ influencerId: "", title: "", occasion: "" });
+  const [products, setProducts] = useState<ProductEntry[]>([{ key: 0, images: [], fields: emptyProduct() }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const set = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
+  const rule = FORMATS[format];
+  const multi = rule.products.max > 1;
 
-  // Sensible defaults once the lists load: first active influencer, the first source (Amazon).
+  // Sensible defaults once the lists load: first active influencer, the first store (Amazon).
   if (!form.influencerId && influencers.data?.length) {
     const first = influencers.data.find((i) => i.status === "active") ?? influencers.data[0];
     setForm({ ...form, influencerId: first.id });
   }
-  if (!form.sourceId && sources.data?.length) setForm({ ...form, sourceId: sources.data[0].id });
+  const defaultSource = sources.data?.[0]?.id ?? "";
+  if (defaultSource && products.some((p) => !p.fields.sourceId)) {
+    setProducts(products.map((p) => (p.fields.sourceId ? p : { ...p, fields: { ...p.fields, sourceId: defaultSource } })));
+  }
 
-  const source = sources.data?.find((s) => s.id === form.sourceId);
+  const pickFormat = (f: StoryFormat) => {
+    setFormat(f);
+    const { min, max } = FORMATS[f].products;
+    // Keep what was entered; add or drop empty products to fit the format.
+    let next = products.slice(0, Math.max(min, Math.min(max, products.length)));
+    let key = Math.max(...products.map((p) => p.key)) + 1;
+    while (next.length < min) next = [...next, { key: key++, images: [], fields: emptyProduct(next.at(-1)?.fields.sourceId ?? defaultSource) }];
+    setProducts(next);
+  };
+  const updateProduct = (key: number, patch: Partial<ProductEntry>) => setProducts(products.map((p) => (p.key === key ? { ...p, ...patch } : p)));
+  const addProduct = () =>
+    setProducts([...products, { key: Math.max(...products.map((p) => p.key)) + 1, images: [], fields: emptyProduct(products.at(-1)?.fields.sourceId ?? defaultSource) }]);
 
   const submit = async () => {
-    const parsed = ProjectFieldsSchema.safeParse({ ...form, priceModeOverride: override });
-    const next: Record<string, string> = parsed.success
-      ? {}
-      : Object.fromEntries(parsed.error.issues.map((i) => [i.path.join("."), i.message]));
-    if (images.length === 0) next.images = "Add at least one product photo";
+    const next: Record<string, string> = {};
+    const project = ProjectFieldsSchema.safeParse({ ...form, format });
+    if (!project.success) for (const i of project.error.issues) next[i.path.join(".")] = i.message;
+    products.forEach((p, n) => {
+      const parsed = ProductFieldsSchema.safeParse(p.fields);
+      if (!parsed.success) for (const i of parsed.error.issues) next[`products.${n}.${i.path.join(".")}`] = i.message;
+      if (p.images.length === 0) next[`products.${n}.images`] = "Add at least one photo";
+    });
     setErrors(next);
-    if (Object.keys(next).length) return;
+    if (Object.keys(next).length) {
+      toast.error("Check the highlighted fields");
+      return;
+    }
 
     setSubmitting(true);
     try {
       const body = new FormData();
-      images.forEach((img) => body.append("images", img.file));
-      body.append("roles", JSON.stringify(images.map((i) => i.role)));
-      Object.entries(form).forEach(([k, v]) => body.append(k, v));
-      if (override) body.append("priceModeOverride", override);
-      const project = await api.upload<ProjectDto>("/projects", body);
+      body.append("influencerId", form.influencerId);
+      body.append("format", format);
+      body.append("title", form.title);
+      body.append("occasion", form.occasion);
+      body.append(
+        "products",
+        JSON.stringify(products.map((p) => ({ ...p.fields, priceModeOverride: p.fields.priceModeOverride ?? null, imageCount: p.images.length }))),
+      );
+      products.forEach((p) => p.images.forEach((img) => body.append("images", img.file)));
+      body.append("roles", JSON.stringify(products.flatMap((p) => p.images.map((i) => i.role))));
+      const created = await api.upload<ProjectDto>("/projects", body);
       await queryClient.invalidateQueries({ queryKey: projectKeys.all });
 
-      // Analysis starts straight away; the analysis page follows the job.
-      const job = await api.post<JobDto>(`/projects/${project.id}/analyze`, {});
-      void watch(job, {
-        label: "Analysing product",
-        successMessage: "Product analysed",
-        onSuccess: () => void queryClient.invalidateQueries({ queryKey: projectKeys.one(project.id) }),
-      });
-      router.push(`/projects/${project.id}/analysis`);
+      // Each product is analysed straight away; the analysis page follows the jobs.
+      const jobs = await api.post<JobDto[]>(`/projects/${created.id}/analyze`, {});
+      for (const job of jobs) {
+        void watch(job, {
+          label: "Analysing product",
+          successMessage: "Product analysed",
+          onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["projects", created.id] }),
+        });
+      }
+      router.push(`/projects/${created.id}/analysis`);
     } catch (error) {
       if (error instanceof ApiError) setErrors(error.fieldErrors());
       toast.error(errorMessage(error));
@@ -95,66 +119,63 @@ export default function NewProjectPage() {
 
   return (
     <>
-      <PageHeader title="New project" description="Product photos and details. Analysis starts as soon as you create it." />
+      <PageHeader title="New project" description="Pick the kind of Reel, then add the products. Analysis starts as soon as you create it." />
       <div className="rounded-xl border bg-card p-6">
-        <Section title="Product photos" hint="From the listing. Tag each one so the right photo is attached to each scene.">
-          <ProductImageDropzone value={images} onChange={setImages} />
-          <FieldError message={errors.images} />
+        <Section title="Format" hint="How the Reel is told. You can't change it once the storyboard exists.">
+          <FormatPicker value={format} onChange={pickFormat} />
         </Section>
 
-        <Section title="Product">
-          <div>
-            <Label className="mb-1.5 block">Product title</Label>
-            <Input value={form.productTitle} onChange={(e) => set("productTitle", e.target.value)} placeholder="As on the listing" />
-            <FieldError message={errors.productTitle} />
-          </div>
-          <div>
-            <Label className="mb-1.5 block">Occasion or mood</Label>
-            <Input value={form.occasion} onChange={(e) => set("occasion", e.target.value)} placeholder="e.g. Diwali party" />
-            <FieldError message={errors.occasion} />
+        <Section title="The Reel" hint={rule.titleOnScreen ? "The title opens the Reel as on-screen text." : undefined}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label className="mb-1.5 block">{multi || rule.titleOnScreen ? "Title" : "Product title"}</Label>
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={rule.titleExample} />
+              <FieldError message={errors.title} />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Occasion or mood</Label>
+              <Input value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} placeholder="e.g. Diwali party" />
+              <FieldError message={errors.occasion} />
+            </div>
           </div>
         </Section>
 
-        <Section title="Source & price">
-          <SourcePicker sources={sources.data ?? []} value={form.sourceId} onChange={(id) => set("sourceId", id)} />
-          <FieldError message={errors.sourceId} />
-          <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
-            <div>
-              <Label className="mb-1.5 block">Price (₹)</Label>
-              <Input
-                type="number"
-                min={1}
-                value={form.priceInr}
-                onChange={(e) => set("priceInr", e.target.value)}
-                placeholder="1499"
-              />
-              <FieldError message={errors.priceInr} />
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Price on the badge</Label>
-              <PriceModeField price={Number(form.priceInr) || 0} source={source} override={override} onOverride={setOverride} />
-            </div>
+        {products.map((p, n) => (
+          <Section
+            key={p.key}
+            title={multi ? `Product ${n + 1}` : "Product"}
+            hint="Photos from the listing; tag each one so the right photo is attached to each scene."
+          >
+            {multi && products.length > rule.products.min && (
+              <Button variant="ghost" size="sm" className="self-end text-muted-foreground" onClick={() => setProducts(products.filter((x) => x.key !== p.key))}>
+                <X /> Remove product {n + 1}
+              </Button>
+            )}
+            <ProductImageDropzone value={p.images} onChange={(images) => updateProduct(p.key, { images })} />
+            <FieldError message={errors[`products.${n}.images`]} />
+            <ProductFields
+              value={p.fields}
+              onChange={(fields) => updateProduct(p.key, { fields })}
+              sources={sources.data ?? []}
+              showNote={multi}
+              errors={Object.fromEntries(
+                Object.entries(errors)
+                  .filter(([k]) => k.startsWith(`products.${n}.`))
+                  .map(([k, v]) => [k.slice(`products.${n}.`.length), v]),
+              )}
+            />
+          </Section>
+        ))}
+        {multi && products.length < rule.products.max && (
+          <div className="flex justify-center border-t py-4">
+            <Button variant="outline" onClick={addProduct}>
+              <Plus /> Add product {products.length + 1}
+            </Button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label className="mb-1.5 block">Product URL (optional)</Label>
-              <Input value={form.productUrl} onChange={(e) => set("productUrl", e.target.value)} placeholder="https://" />
-              <FieldError message={errors.productUrl} />
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Affiliate link (optional)</Label>
-              <Input value={form.affiliateLink} onChange={(e) => set("affiliateLink", e.target.value)} placeholder="https://" />
-              <FieldError message={errors.affiliateLink} />
-            </div>
-          </div>
-        </Section>
+        )}
 
         <Section title="Influencer">
-          <InfluencerPicker
-            influencers={influencers.data ?? []}
-            value={form.influencerId}
-            onChange={(id) => set("influencerId", id)}
-          />
+          <InfluencerPicker influencers={influencers.data ?? []} value={form.influencerId} onChange={(id) => setForm({ ...form, influencerId: id })} />
           <FieldError message={errors.influencerId} />
         </Section>
 

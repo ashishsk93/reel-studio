@@ -32,7 +32,22 @@ export const SCENE_LABEL: Record<string, string> = {
   wearing_front: "Wearing · front",
   wearing_alt: "Wearing · alt angle",
   custom: "Custom",
+  hook: "Hook",
+  try_on: "Try-on",
+  styled: "Styled look",
+  transition_before: "Transition · before",
+  transition_after: "Transition · after",
 };
+
+/** A product as the storyboard offers it: number, title and the image roles it has. */
+export interface SceneProductOption {
+  id: string;
+  number: number;
+  title: string;
+  roles: ProductImageRole[];
+}
+
+const NO_PRODUCT = "none";
 export const SHOT_LABEL: Record<string, string> = {
   full_body: "Full body",
   three_quarter: "Three-quarter",
@@ -59,6 +74,7 @@ export const BLANK_SCENE: SceneEditable = {
   imageModelReason: "",
   motion: "",
   backgroundId: null,
+  productId: null,
 };
 
 const NO_BACKGROUND = "none";
@@ -146,7 +162,7 @@ export function SceneDialog({
   open,
   onOpenChange,
   scene,
-  availableRoles,
+  products,
   backgrounds,
   errors = {},
   saving,
@@ -155,7 +171,7 @@ export function SceneDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scene?: SceneDto;
-  availableRoles: ProductImageRole[];
+  products: SceneProductOption[];
   backgrounds: BackgroundDto[];
   errors?: Record<string, string>;
   saving?: boolean;
@@ -163,9 +179,13 @@ export function SceneDialog({
 }) {
   // Fresh from the scene each time the dialog opens.
   const opened = open ? `${scene?.id ?? "new"}:${scene?.updatedAt ?? ""}` : null;
-  const [form, setForm] = useSyncedState<SceneEditable>(opened, () =>
-    scene ? pick(scene) : { ...BLANK_SCENE, productRoles: availableRoles.includes("front") ? ["front"] : availableRoles.slice(0, 1) },
-  );
+  const [form, setForm] = useSyncedState<SceneEditable>(opened, () => {
+    if (scene) return pick(scene);
+    const first = products[0];
+    const roles = first?.roles ?? [];
+    return { ...BLANK_SCENE, productId: first?.id ?? null, productRoles: roles.includes("front") ? ["front"] : roles.slice(0, 1) };
+  });
+  const availableRoles = products.find((p) => p.id === form.productId)?.roles ?? [];
   const [override, setOverride] = useSyncedState(opened, () => scene?.promptOverride ?? false);
   const [prompt, setPrompt] = useSyncedState(opened, () => scene?.imagePrompt ?? "");
 
@@ -244,6 +264,31 @@ export function SceneDialog({
               onChange={(v) => set("imageModel", v as SceneEditable["imageModel"])}
             />
           </Field>
+          {products.length > 1 && (
+            <Field label="Product" hint="The product this scene shows or she wears" className="sm:col-span-3">
+              <Select
+                value={form.productId ?? NO_PRODUCT}
+                items={[{ value: NO_PRODUCT, label: "No product" }, ...products.map((p) => ({ value: p.id, label: `${p.number}. ${p.title}` }))]}
+                onValueChange={(v) => {
+                  const productId = !v || v === NO_PRODUCT ? null : String(v);
+                  const roles = products.find((p) => p.id === productId)?.roles ?? [];
+                  setForm({ ...form, productId, productRoles: form.productRoles.filter((r) => roles.includes(r)) });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PRODUCT}>No product</SelectItem>
+                  {products.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.number}. {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Product images to attach" className="sm:col-span-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <label className="mr-3 flex items-center gap-2 text-xs">

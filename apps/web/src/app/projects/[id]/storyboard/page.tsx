@@ -19,7 +19,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { BackgroundDto, JobDto, ProductImageRole, SceneDto } from "@reel/shared";
+import { FORMATS, type BackgroundDto, type JobDto, type ProductImageRole, type SceneDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,10 +40,10 @@ import {
 import { EmptyState, ErrorState } from "@/components/page-header";
 import { PromptCard } from "@/components/prompt-card";
 import { JobBanner } from "@/components/projects/job-banner";
-import { BackgroundSelect, MODEL_LABEL, SCENE_LABEL, SHOT_LABEL, SceneDialog, type SceneSubmit } from "@/components/projects/scene-dialog";
+import { BackgroundSelect, MODEL_LABEL, SCENE_LABEL, SHOT_LABEL, SceneDialog, type SceneProductOption, type SceneSubmit } from "@/components/projects/scene-dialog";
 import { API_URL, ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
-import { projectKeys, useProject, useSpec, useStoryboard } from "@/lib/queries";
+import { projectKeys, useProject, useSpecs, useStoryboard } from "@/lib/queries";
 import { useSyncedState } from "@/lib/hooks";
 
 const GENERATE = "storyboard.generate";
@@ -53,15 +53,22 @@ export default function StoryboardStep() {
   const queryClient = useQueryClient();
   const watch = useJobWatcher();
   const { data: project } = useProject(id);
-  const { data: spec } = useSpec(id);
-  const { data: board, error } = useStoryboard(id, Boolean(spec));
+  const { data: specs } = useSpecs(id);
+  const analysed = Boolean(project && specs && project.products.every((p) => specs.some((sp) => sp.productId === p.id)));
+  const { data: board, error } = useStoryboard(id, analysed);
   const jobs = useProjectJobs(id);
   const generating = jobs.active(GENERATE);
   const lastGenerate = jobs.latest(GENERATE);
   const [adding, setAdding] = useState(false);
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
 
-  const roles = [...new Set(project?.productImages.map((i) => i.role) ?? [])] as ProductImageRole[];
+  const productOptions: SceneProductOption[] = (project?.products ?? []).map((p) => ({
+    id: p.id,
+    number: p.number,
+    title: p.title,
+    roles: [...new Set(p.images.map((i) => i.role))] as ProductImageRole[],
+  }));
+  const reelTarget = project ? FORMATS[project.format].reelSec : { min: 16, max: 20 };
   const refresh = () => queryClient.invalidateQueries({ queryKey: projectKeys.storyboard(id) });
 
   const generate = async (instruction?: string, force = false) => {
@@ -88,9 +95,9 @@ export default function StoryboardStep() {
   });
 
   if (!project) return null;
-  if (!spec) {
+  if (!analysed) {
     return (
-      <EmptyState title="Analyse the product first">
+      <EmptyState title={project.products.length > 1 ? "Analyse every product first" : "Analyse the product first"}>
         <Link className="text-primary hover:underline" href={`/projects/${id}/analysis`}>
           Go to step 2
         </Link>
@@ -126,8 +133,11 @@ export default function StoryboardStep() {
           <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3">
             <div className="text-sm">
               <span className="font-semibold">{scenes.length} scenes</span> · {board!.totalSec}s + {board!.ctaSec}s CTA ={" "}
-              <span className={reelSec < 16 || reelSec > 20 ? "font-semibold text-amber-600" : "font-semibold"}>{reelSec}s</span>
-              <span className="text-muted-foreground"> (target 16–20 s)</span>
+              <span className={reelSec < reelTarget.min || reelSec > reelTarget.max ? "font-semibold text-amber-600" : "font-semibold"}>{reelSec}s</span>
+              <span className="text-muted-foreground">
+                {" "}
+                (target {reelTarget.min}–{reelTarget.max} s)
+              </span>
             </div>
             {board!.notes.length > 0 && (
               <Popover>
@@ -163,7 +173,7 @@ export default function StoryboardStep() {
                 key={scene.id}
                 scene={scene}
                 projectId={id}
-                availableRoles={roles}
+                products={productOptions}
                 backgrounds={board?.backgrounds ?? []}
                 isFirst={i === 0}
                 isLast={i === scenes.length - 1}
@@ -177,7 +187,7 @@ export default function StoryboardStep() {
       <SceneDialog
         open={adding}
         onOpenChange={setAdding}
-        availableRoles={roles}
+        products={productOptions}
         backgrounds={board?.backgrounds ?? []}
         errors={addErrors}
         saving={add.isPending}
@@ -240,7 +250,7 @@ function GenerateButton({
 function SceneCard({
   scene,
   projectId,
-  availableRoles,
+  products,
   backgrounds,
   isFirst,
   isLast,
@@ -248,7 +258,7 @@ function SceneCard({
 }: {
   scene: SceneDto;
   projectId: string;
-  availableRoles: ProductImageRole[];
+  products: SceneProductOption[];
   backgrounds: BackgroundDto[];
   isFirst: boolean;
   isLast: boolean;
@@ -317,7 +327,7 @@ function SceneCard({
           <div>
             <p className="text-sm font-semibold">{SCENE_LABEL[scene.type]}</p>
             <p className="text-xs text-muted-foreground">
-              {SHOT_LABEL[scene.shotKind]} · {scene.targetDurationSec}s
+              {SHOT_LABEL[scene.shotKind]} · {scene.type === "transition_before" ? "start frame only" : `${scene.targetDurationSec}s`}
             </p>
           </div>
           <div className="ml-auto flex">
@@ -329,6 +339,14 @@ function SceneCard({
             </Button>
           </div>
         </div>
+        {products.length > 1 && (
+          <Badge variant="outline" className="max-w-full self-start truncate">
+            {(() => {
+              const p = products.find((x) => x.id === scene.productId);
+              return p ? `Product ${p.number}: ${p.title}` : "No product";
+            })()}
+          </Badge>
+        )}
         <p className="text-xs text-muted-foreground">{scene.purpose}</p>
         <div>
           <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">On-screen text</p>
@@ -429,7 +447,7 @@ function SceneCard({
         open={editing}
         onOpenChange={setEditing}
         scene={scene}
-        availableRoles={availableRoles}
+        products={products}
         backgrounds={backgrounds}
         errors={errors}
         saving={update.isPending}

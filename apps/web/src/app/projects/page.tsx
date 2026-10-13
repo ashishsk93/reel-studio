@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Clapperboard, Plus } from "lucide-react";
-import { STEPS, formatInr, isStepDone, type ProjectSummaryDto } from "@reel/shared";
+import { STEPS, FORMATS, formatInr, isStepDone, type ProjectSummaryDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,7 +52,7 @@ function ProjectCard({ project }: { project: ProjectSummaryDto }) {
       <div className="relative aspect-[3/4] bg-muted">
         {project.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={project.coverUrl} alt={project.productTitle} className="size-full object-cover" />
+          <img src={project.coverUrl} alt={project.title} className="size-full object-cover" />
         )}
         <Badge className="absolute top-2 right-2" variant={project.postedAt ? "default" : "secondary"}>
           {project.postedAt ? "Posted" : `Step ${Math.min(done + 1, STEPS.length)} of ${STEPS.length}`}
@@ -67,9 +67,10 @@ function ProjectCard({ project }: { project: ProjectSummaryDto }) {
         )}
       </div>
       <div className="p-3">
-        <p className="line-clamp-2 text-sm font-medium">{project.productTitle}</p>
+        <p className="line-clamp-2 text-sm font-medium">{project.title}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {project.influencer.name} · {project.source.displayName} · {formatInr(project.priceInr)}
+          {FORMATS[project.format].label} · {project.influencer.name} · {project.sources.map((s) => s.displayName).join(", ")} ·{" "}
+          {project.productCount > 1 ? `${project.productCount} products` : formatInr(project.priceRange.min)}
         </p>
         <p className="text-xs text-muted-foreground">{project.occasion}</p>
       </div>

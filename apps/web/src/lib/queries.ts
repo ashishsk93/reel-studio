@@ -79,10 +79,11 @@ export function useProject(id: string) {
   return useQuery({ queryKey: projectKeys.one(id), queryFn: () => api.get<ProjectDto>(`/projects/${id}`) });
 }
 
-export function useSpec(id: string) {
+/** Every analysed product of a project (match by productId). */
+export function useSpecs(id: string) {
   return useQuery({
     queryKey: projectKeys.spec(id),
-    queryFn: async () => (await api.get<{ spec: ProductSpecDto | null }>(`/projects/${id}/spec`)).spec,
+    queryFn: async () => (await api.get<{ specs: ProductSpecDto[] }>(`/projects/${id}/specs`)).specs,
   });
 }
 

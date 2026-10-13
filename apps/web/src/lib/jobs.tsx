@@ -139,6 +139,8 @@ export function useProjectJobs(projectId: string) {
         const job = latest(type);
         return job && ACTIVE.has(job.status) ? job : undefined;
       },
+      /** Every queued or running job of a type (e.g. one analysis per product). */
+      allActive: (type: string) => data.filter((j) => j.type === type && ACTIVE.has(j.status)),
     };
   }, [data]);
 }

@@ -12,7 +12,7 @@ import { EmptyState, ErrorState } from "@/components/page-header";
 import { JobCard } from "@/components/video/job-card";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
-import { projectKeys, useImagesStep, useVideoStep } from "@/lib/queries";
+import { projectKeys, useImagesStep, useProject, useVideoStep } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 const MODES: Array<{ value: VideoMode; label: string; hint: string }> = [
@@ -25,6 +25,9 @@ export default function VideoPromptsPage() {
   const queryClient = useQueryClient();
   const { data: images } = useImagesStep(id);
   const { data, error, isPending } = useVideoStep(id);
+  const { data: project } = useProject(id);
+  // Multi-shot runs are for one product's scenes; other formats always generate one video per scene.
+  const modes = project && project.format !== "classic" ? MODES.filter((m) => m.value === "single") : MODES;
   useJobRefresh(["video.prompt"], projectKeys.video(id));
   const setData = (next: VideoStepDto) => queryClient.setQueryData(projectKeys.video(id), next);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["projects", id] });
@@ -61,7 +64,7 @@ export default function VideoPromptsPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
         <div className="flex rounded-lg border p-0.5">
-          {MODES.map((m) => (
+          {modes.map((m) => (
             <button
               key={m.value}
               type="button"

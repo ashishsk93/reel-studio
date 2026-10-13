@@ -6,12 +6,13 @@ import { useParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Loader2, Plus, RefreshCw, ScanSearch, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
-import type { JobDto, MustMatchItem, ProductSpecDto, ProductSpecSave } from "@reel/shared";
+import type { JobDto, MustMatchItem, ProductSpecDto, ProductSpecSave, ProjectDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, ErrorState } from "@/components/page-header";
 import { CopyButton } from "@/components/copy-button";
 import { ListEditor } from "@/components/list-editor";
@@ -19,7 +20,7 @@ import { JobBanner } from "@/components/projects/job-banner";
 import { SpecEditor } from "@/components/projects/spec-editor";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobWatcher, useProjectJobs } from "@/lib/jobs";
-import { projectKeys, useProject, useSpec } from "@/lib/queries";
+import { projectKeys, useProject, useSpecs } from "@/lib/queries";
 import { useSyncedState } from "@/lib/hooks";
 import { Expandable } from "@/components/lightbox";
 
@@ -33,41 +34,91 @@ function editable(s: ProductSpecDto): ProductSpecSave {
 export default function AnalysisStep() {
   const { id } = useParams<{ id: string }>();
   const { data: project } = useProject(id);
-  const { data: spec, isPending, error } = useSpec(id);
+  const { data: specs, isPending, error } = useSpecs(id);
   const jobs = useProjectJobs(id);
-  const running = jobs.active(ANALYZE);
+  const running = jobs.allActive(ANALYZE);
   const lastFailed = jobs.latest(ANALYZE)?.status === "failed" ? jobs.latest(ANALYZE) : undefined;
+  const [tab, setTab] = useState<string | null>(null);
 
   if (error) return <ErrorState error={error} />;
-  if (isPending || !project) return null;
+  if (isPending || !project || !specs) return null;
+  const specOf = (productId: string) => specs.find((s) => s.productId === productId);
+  const missing = project.products.filter((p) => !specOf(p.id));
+  const multi = project.products.length > 1;
+  const current = project.products.find((p) => p.id === tab) ?? project.products[0];
+
+  const view = (product: ProjectDto["products"][number]) => {
+    const spec = specOf(product.id);
+    return spec ? (
+      <SpecView projectId={id} productId={product.id} spec={spec} images={product.images} busy={running.length > 0} allAnalysed={missing.length === 0} />
+    ) : (
+      running.length === 0 && (
+        <EmptyState icon={<ScanSearch className="size-8" />} title={`${product.title}: not analysed yet`}>
+          <div className="mt-3">
+            <AnalyzeButton productId={product.id} label="Analyse product" />
+          </div>
+        </EmptyState>
+      )
+    );
+  };
 
   return (
     <div className="flex flex-col gap-5">
-      {running && <JobBanner job={running} label="Claude is reading the product photos" />}
-      {!running && lastFailed && !spec && (
+      {running.length > 0 && (
+        <JobBanner job={running[0]} label={running.length > 1 ? `Claude is reading the photos of ${running.length} products` : "Claude is reading the product photos"} />
+      )}
+      {running.length === 0 && lastFailed && missing.length > 0 && (
         <ErrorState error={new Error(`The last analysis failed: ${lastFailed.error}`)} onRetry={null} />
       )}
-      {!spec ? (
-        !running && (
-          <EmptyState icon={<ScanSearch className="size-8" />} title="Not analysed yet">
-            <div className="mt-3">
-              <AnalyzeButton projectId={id} label="Analyse product" />
-            </div>
-          </EmptyState>
-        )
+      {multi && missing.length > 1 && running.length === 0 && (
+        <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm">
+          <span>{missing.length} products are not analysed yet.</span>
+          <AnalyzeAllButton projectId={id} />
+        </div>
+      )}
+      {multi ? (
+        <Tabs value={current.id} onValueChange={(v) => setTab(String(v))}>
+          <TabsList className="flex-wrap">
+            {project.products.map((p) => (
+              <TabsTrigger key={p.id} value={p.id}>
+                {p.number}. {p.title.length > 28 ? `${p.title.slice(0, 27)}…` : p.title}
+                {!specOf(p.id) && <span className="ml-1 size-1.5 rounded-full bg-amber-500" />}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {project.products.map((p) => (
+            <TabsContent key={p.id} value={p.id} className="mt-4 flex flex-col gap-5">
+              {view(p)}
+            </TabsContent>
+          ))}
+        </Tabs>
       ) : (
-        <SpecView projectId={id} spec={spec} images={project.productImages} busy={Boolean(running)} />
+        view(current)
       )}
     </div>
   );
 }
 
-function AnalyzeButton({ projectId, label, withInstruction }: { projectId: string; label: string; withInstruction?: boolean }) {
+function AnalyzeAllButton({ projectId }: { projectId: string }) {
+  const watch = useJobWatcher();
+  const start = useMutation({
+    mutationFn: () => api.post<JobDto[]>(`/projects/${projectId}/analyze`, {}),
+    onSuccess: (jobs) => jobs.forEach((job) => void watch(job, { label: "Analysing product", successMessage: "Product analysed" })),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <Button onClick={() => start.mutate()} disabled={start.isPending}>
+      <ScanSearch /> Analyse all
+    </Button>
+  );
+}
+
+function AnalyzeButton({ productId, label, withInstruction }: { productId: string; label: string; withInstruction?: boolean }) {
   const watch = useJobWatcher();
   const [instruction, setInstruction] = useState("");
   const [open, setOpen] = useState(false);
   const start = useMutation({
-    mutationFn: () => api.post<JobDto>(`/projects/${projectId}/analyze`, { instruction: instruction.trim() || undefined }),
+    mutationFn: () => api.post<JobDto>(`/products/${productId}/analyze`, { instruction: instruction.trim() || undefined }),
     onSuccess: (job) => {
       setOpen(false);
       setInstruction("");
@@ -118,14 +169,18 @@ function Card({ title, hint, actions, children }: { title: string; hint?: string
 
 function SpecView({
   projectId,
+  productId,
   spec,
   images,
   busy,
+  allAnalysed,
 }: {
   projectId: string;
+  productId: string;
   spec: ProductSpecDto;
   images: Array<{ id: string; url: string; role: string }>;
   busy: boolean;
+  allAnalysed: boolean;
 }) {
   const queryClient = useQueryClient();
   const watch = useJobWatcher();
@@ -136,7 +191,7 @@ function SpecView({
   const paragraphJob = jobs.active(PARAGRAPH);
 
   const save = useMutation({
-    mutationFn: () => api.put<ProductSpecDto>(`/projects/${projectId}/spec`, draft),
+    mutationFn: () => api.put<ProductSpecDto>(`/products/${productId}/spec`, draft),
     onSuccess: () => {
       toast.success("Analysis saved");
       void queryClient.invalidateQueries({ queryKey: projectKeys.spec(projectId) });
@@ -147,7 +202,7 @@ function SpecView({
   const rewriteParagraph = async () => {
     try {
       if (dirty) await save.mutateAsync();
-      const job = await api.post<JobDto>(`/projects/${projectId}/spec/paragraph`, {
+      const job = await api.post<JobDto>(`/products/${productId}/spec/paragraph`, {
         instruction: paragraphInstruction.trim() || undefined,
       });
       setParagraphInstruction("");
@@ -166,8 +221,8 @@ function SpecView({
         <Badge variant="secondary">Version {spec.version}</Badge>
         {spec.editedByUser && <Badge variant="outline">Edited by you</Badge>}
         <div className="ml-auto flex gap-2">
-          <AnalyzeButton projectId={projectId} label="Re-analyse" withInstruction />
-          <Button nativeButton={false} render={<Link href={`/projects/${projectId}/storyboard`} />} disabled={dirty}>
+          <AnalyzeButton productId={productId} label="Re-analyse" withInstruction />
+          <Button nativeButton={false} render={<Link href={`/projects/${projectId}/storyboard`} />} disabled={dirty || !allAnalysed}>
             Storyboard <ArrowRight />
           </Button>
         </div>

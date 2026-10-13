@@ -54,7 +54,7 @@ export function ReelPreview({
     };
   }, [segment.inSec, segment.outSec, segment.videoUrl]);
 
-  const badge = step.badge && segment.badgeEnabled && placement ? step.badge : null;
+  const badge = segment.badge && segment.badgeEnabled && placement ? segment.badge : null;
   const pos = drag ?? (placement ? { x: placement.x, y: placement.y } : null);
 
   const down = (e: ReactPointerEvent) => {

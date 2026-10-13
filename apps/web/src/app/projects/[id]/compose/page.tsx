@@ -182,12 +182,14 @@ function Overlays({ projectId, step, setData }: { projectId: string; step: Compo
           </p>
         )}
         <p className="text-center text-xs text-muted-foreground">
-          {step.badge ? (
+          {seg.badge && seg.product ? (
             <>
-              Badge: {step.source.displayName} {step.priceLabel ?? "(logo only)"} · drag it to move
+              Badge: {seg.product.store} {seg.product.priceLabel ?? "(logo only)"} · drag it to move
             </>
-          ) : (
+          ) : seg.product ? (
             "No badge: upload the store logo under Sources & logos"
+          ) : (
+            "No badge: this scene shows no product"
           )}
         </p>
       </aside>

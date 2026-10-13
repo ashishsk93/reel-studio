@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useParams, useSelectedLayoutSegment } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { STEPS, formatInr, type StepKey } from "@reel/shared";
+import { FORMATS, STEPS, formatInr, type ProjectSummaryDto, type StepKey } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stepper } from "@/components/projects/stepper";
@@ -32,10 +32,12 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
               <img src={project.coverUrl} alt="" className="size-14 rounded-xl border object-cover" />
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-display text-xl font-semibold">{project.productTitle}</h1>
+              <h1 className="truncate font-display text-xl font-semibold">{project.title}</h1>
               <p className="text-sm text-muted-foreground">
-                {project.influencer.name} · {project.source.displayName} · {formatInr(project.priceInr)}
-                {project.priceLabel && project.priceMode !== "exact" && ` (badge: ${project.priceLabel})`} · {project.occasion}
+                {FORMATS[project.format].label} · {project.influencer.name} · {project.sources.map((s) => s.displayName).join(", ")} ·{" "}
+                {priceText(project)}
+                {project.products.length === 1 && project.products[0].priceLabel && project.products[0].priceMode !== "exact" && ` (badge: ${project.products[0].priceLabel})`} ·{" "}
+                {project.occasion}
               </p>
             </div>
             {usage && (usage.total.calls > 0 || usage.klingCredits > 0) && (
@@ -57,4 +59,11 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
       {children}
     </>
   );
+}
+
+/** "₹449" for one product, "3 products · ₹349–₹499" for several. */
+export function priceText(p: Pick<ProjectSummaryDto, "productCount" | "priceRange">): string {
+  const { min, max } = p.priceRange;
+  const range = min === max ? formatInr(min) : `${formatInr(min)}–${formatInr(max)}`;
+  return p.productCount > 1 ? `${p.productCount} products · ${range}` : range;
 }
