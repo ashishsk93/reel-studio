@@ -81,6 +81,8 @@ interface DecisionsResponse {
 @Injectable()
 export class DecisionService {
   private readonly logger = new Logger(DecisionService.name);
+  /** Set after a 401/403 (bad key, or no access to the model): decisions stay off until restart. */
+  private blocked: string | null = null;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -90,7 +92,12 @@ export class DecisionService {
   ) {}
 
   get enabled(): boolean {
-    return Boolean(this.config.openaiApiKey) && this.config.llmMode !== 'mock' && this.config.llmMode !== 'replay';
+    return Boolean(this.config.openaiApiKey) && !this.blocked && this.config.llmMode !== 'mock' && this.config.llmMode !== 'replay';
+  }
+
+  /** Why decisions are off although a key is set (e.g. the project has no access to the model). */
+  get blockedReason(): string | null {
+    return this.blocked;
   }
 
   /** Answers keyed by question name, or null when decisions are off or the request failed. */
@@ -122,7 +129,18 @@ export class DecisionService {
             continue;
           }
           if (!res.ok) {
-            error = `Decisions ${res.status}: ${(await res.text()).slice(0, 300)}`;
+            const text = (await res.text()).slice(0, 300);
+            error = `Decisions ${res.status}: ${text}`;
+            if (res.status === 401 || res.status === 403) {
+              let message = text;
+              try {
+                message = (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? text;
+              } catch {
+                // not JSON: keep the raw text
+              }
+              this.blocked = `${res.status}: ${message}`;
+              this.logger.warn(`Decisions turned off until restart (${this.blocked}); falling back to Claude and the rules.`);
+            }
             break;
           }
           response = (await res.json()) as DecisionsResponse;

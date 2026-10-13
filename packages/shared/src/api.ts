@@ -287,6 +287,8 @@ export interface HealthDto {
   hasApiKey: boolean;
   /** OpenAI's Decisions API is configured (OPENAI_API_KEY) and used for the app's decisions. */
   decisions: boolean;
+  /** Set when a key is configured but OpenAI refused it (e.g. no access to the model); decisions are off until restart. */
+  decisionsBlocked: string | null;
   ffmpeg: string | null;
   ffprobe: string | null;
   dataDir: string;

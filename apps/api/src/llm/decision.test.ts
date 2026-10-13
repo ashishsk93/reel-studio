@@ -65,6 +65,19 @@ describe('DecisionService', () => {
     expect(await decisions.ask({ task: 'copy_guard', input: 'x', questions: [{ type: 'predicate', name: 'q', instructions: 'i' }] })).toBeNull();
     expect(calls[0]).toMatchObject({ ok: false, error: expect.stringContaining('401') });
   });
+
+  it('stops asking after OpenAI refuses access, until restart', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'The project does not have access to this model.' } }), { status: 403 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { decisions } = service();
+    await decisions.ask({ task: 'copy_guard', input: 'x', questions: [{ type: 'predicate', name: 'q', instructions: 'i' }] });
+    expect(decisions.enabled).toBe(false);
+    expect(decisions.blockedReason).toBe('403: The project does not have access to this model.');
+    expect(await decisions.ask({ task: 'copy_guard', input: 'x', questions: [{ type: 'predicate', name: 'q', instructions: 'i' }] })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('CopyGuardService', () => {

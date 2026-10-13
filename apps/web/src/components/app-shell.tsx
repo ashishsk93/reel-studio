@@ -98,6 +98,13 @@ function StatusPanel() {
             OpenAI decisions on
           </>
         )}
+        {data.decisionsBlocked && (
+          <>
+            <br />
+            <span className="mr-1.5 inline-block size-1.5 rounded-full bg-amber-500 align-middle" />
+            <span title={data.decisionsBlocked}>OpenAI decisions off (no access); using Claude</span>
+          </>
+        )}
       </div>
     );
   }
