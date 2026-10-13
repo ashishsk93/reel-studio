@@ -294,7 +294,8 @@ export class CoverCaptionsService implements OnModuleInit {
     const prev = await this.coverState(projectId);
     const cover = (await decided)?.get('cover');
     const decidedBest = cover?.type === 'choice' ? Number(cover.choice) - 1 : -1;
-    const useDecision = cover?.type === 'choice' && decidedBest >= 0 && decidedBest < picked.length;
+    // Below 20 % confidence the frames are too close to call; Claude's pick stands.
+    const useDecision = cover?.type === 'choice' && cover.confidence >= 0.2 && decidedBest >= 0 && decidedBest < picked.length;
     const state: CoverState = {
       ...prev,
       candidates: picked,

@@ -22,6 +22,11 @@ type Reviewed = Asset & { reviews: Review[] };
 
 const VERDICT_SCORE: Record<string, number> = { pass: 3, warn: 2, fail: 0 };
 const SEVERITY_COST: Record<string, number> = { critical: 1.5, major: 0.6, minor: 0.1 };
+/**
+ * Below this confidence the decision model couldn't tell the versions apart (e.g. 53% vs 47%);
+ * the review verdicts decide instead.
+ */
+export const MIN_PICK_CONFIDENCE = 0.25;
 /** Video versions are shown to the decision model as this many frames each. */
 const FRAMES_PER_VIDEO = 3;
 
@@ -150,7 +155,7 @@ export class VersionPickService {
     });
     const answer = answers?.get('best') as ChoiceAnswer | undefined;
     const chosen = answer?.type === 'choice' ? versions.find((v) => `v${v.version}` === answer.choice) : undefined;
-    if (chosen && answer) {
+    if (chosen && answer && answer.confidence >= MIN_PICK_CONFIDENCE) {
       return {
         assetId: chosen.assetId,
         version: chosen.version,
@@ -159,6 +164,13 @@ export class VersionPickService {
         note: chosen.assetId === fallback.assetId ? 'Agrees with the review verdicts.' : `The review verdicts alone would pick version ${fallback.version}.`,
       };
     }
-    return { assetId: fallback.assetId, version: fallback.version, confidence: null, by: 'rules', note: 'Best review verdict with the fewest serious issues.' };
+    const close = chosen && answer && answer.confidence < MIN_PICK_CONFIDENCE;
+    return {
+      assetId: fallback.assetId,
+      version: fallback.version,
+      confidence: null,
+      by: 'rules',
+      note: close ? 'The versions look about equally good; going by the review verdicts.' : 'Best review verdict with the fewest serious issues.',
+    };
   }
 }
