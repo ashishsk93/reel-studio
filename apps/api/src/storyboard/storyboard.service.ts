@@ -274,7 +274,7 @@ export class StoryboardService implements OnModuleInit {
 
     const scenes = result.data.scenes.map((scene) => this.fromLlm(ctx, scene));
     const built = scenes.map((scene) => this.buildFromFields(ctx, scene));
-    // Jev's copy guardrail: flagged on-screen texts become notes to fix (Compose → New text).
+    // Copy guardrail (decision model): flagged on-screen texts become notes to fix (Compose → New text).
     const flags = await this.copyGuard.check(scenes.map((s, i) => ({ key: String(i), text: s.onScreenText })), projectId);
     const notes = [...result.data.notes, ...flags.map((f) => `Scene ${Number(f.key) + 1}: ${f.message}; change it before rendering.`)];
     const replaced = await this.prisma.scene.findMany({ where: { projectId }, select: { id: true } });

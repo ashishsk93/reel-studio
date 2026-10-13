@@ -285,8 +285,8 @@ export interface HealthDto {
   ok: boolean;
   llmMode: string;
   hasApiKey: boolean;
-  /** The Jev decision model is configured (TYPESAFE_API_KEY) and used. */
-  jev: boolean;
+  /** OpenAI's Decisions API is configured (OPENAI_API_KEY) and used for the app's decisions. */
+  decisions: boolean;
   ffmpeg: string | null;
   ffprobe: string | null;
   dataDir: string;
@@ -344,13 +344,13 @@ export interface AssetDto {
   reviewJob: { id: string; status: JobStatus; error: string | null } | null;
 }
 
-/** The version to approve among several reviewed ones (Jev's pick, or the rules' as fallback). */
+/** The version to approve among several reviewed ones (OpenAI Decisions' pick, or the rules' as fallback). */
 export interface VersionPickDto {
   assetId: string;
   version: number;
-  /** Jev's confidence (0–1); null when the rules decided. */
+  /** The decision model's confidence (0–1); null when the rules decided. */
   confidence: number | null;
-  by: 'jev' | 'rules';
+  by: 'decisions' | 'rules';
   note: string;
 }
 

@@ -22,6 +22,7 @@ import {
 import { Prisma, type Asset, type Composition, type Scene, type Segment } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { JobsService } from '../jobs/jobs.service';
+import { DecisionService } from '../llm/decision.service';
 import { LlmService } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -98,6 +99,7 @@ export class ComposeService implements OnModuleInit {
     private readonly product: ProductService,
     private readonly media: MediaService,
     private readonly videos: VideoAssetsService,
+    private readonly decisions: DecisionService,
   ) {}
 
   onModuleInit(): void {
@@ -402,6 +404,12 @@ export class ComposeService implements OnModuleInit {
     const jpg = await this.compositeFrame(s, (s.inSec + s.outSec) / 2);
     const rel = `projects/${s.projectId}/overlays/${s.id}/check-${randomUUID().slice(0, 8)}.jpg`;
     await this.storage.writeAtomic(rel, jpg);
+    const decided = await this.decidePlacement(rel, s.projectId);
+    if (decided) {
+      await this.storage.remove(rel);
+      if (!decided.ok) await this.prisma.segment.update({ where: { id: segmentId }, data: { placementWarning: `Check: ${decided.note}` } });
+      return decided;
+    }
     const result = await this.llm.call({
       task: 'placement_check',
       schema: PlacementCheckOutputSchema,
@@ -414,6 +422,30 @@ export class ComposeService implements OnModuleInit {
       await this.prisma.segment.update({ where: { id: segmentId }, data: { placementWarning: `Claude: ${result.data.note}` } });
     }
     return result.data;
+  }
+
+  /** Badge check with the decision model: does the badge cover her face, the hands or the key detail? */
+  private async decidePlacement(rel: string, projectId: string): Promise<{ ok: boolean; note: string } | null> {
+    const what = { face: 'her face', hands: 'the hands holding or touching the product', detail: 'the key garment detail (embroidery, neckline, print)' };
+    const answers = await this.decisions.ask({
+      task: 'placement_check',
+      input: [
+        { type: 'text', text: 'One frame of a fashion Reel with a small white pill (store logo and price) placed on it, and maybe on-screen text.' },
+        { type: 'image', path: rel },
+      ],
+      questions: Object.entries(what).map(([name, target]) => ({
+        type: 'predicate' as const,
+        name,
+        instructions: `Does the white price badge cover or overlap ${target}? Touching plain background, hair at the edge or a plain part of the outfit does not count.`,
+      })),
+      projectId,
+    });
+    if (!answers) return null;
+    const covered = Object.entries(what).filter(([name]) => {
+      const a = answers.get(name);
+      return a?.type === 'predicate' && a.probability >= 0.5;
+    });
+    return covered.length ? { ok: false, note: `the badge covers ${covered.map(([, t]) => t).join(' and ')}` } : { ok: true, note: 'clear' };
   }
 
   /** One output frame (1080×1920) with the text and badge composited exactly as rendered. */

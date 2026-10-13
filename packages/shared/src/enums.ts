@@ -96,7 +96,7 @@ export const LLM_TASKS = [
   'detail_regions',
   'placement_check',
   'scene_text',
-  // Jev decisions (TypeSafe)
+  // OpenAI Decisions API
   'copy_guard',
   'version_pick',
   'cover_pick',

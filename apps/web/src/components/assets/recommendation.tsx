@@ -3,7 +3,7 @@
 import { Star } from "lucide-react";
 import type { VersionPickDto } from "@reel/shared";
 
-/** "Recommended: v3 · Jev, 82% confident" under the version strip, with a button to view it. */
+/** "Recommended: version 3 · decision model, 82% confident" under the version strip, with a button to view it. */
 export function RecommendationNote({ pick, onSelect }: { pick: VersionPickDto; onSelect: () => void }) {
   return (
     <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -16,11 +16,11 @@ export function RecommendationNote({ pick, onSelect }: { pick: VersionPickDto; o
       </span>
       <span>
         ·{" "}
-        {pick.by === "jev"
-          ? `Jev, ${Math.round((pick.confidence ?? 0) * 100)}% confident`
+        {pick.by === "decisions"
+          ? `OpenAI decision model, ${Math.round((pick.confidence ?? 0) * 100)}% confident`
           : "from the review verdicts"}
       </span>
-      {pick.by === "jev" && <span>· {pick.note}</span>}
+      {pick.by === "decisions" && <span>· {pick.note}</span>}
     </p>
   );
 }

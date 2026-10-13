@@ -41,8 +41,8 @@ Not in the repository (git-ignored), so a fresh clone needs them: `.env` (your k
 | `ANTHROPIC_API_KEY` | — | Required when `LLM_MODE` is `live` or `record`. |
 | `ANTHROPIC_MODEL_DEFAULT` | `claude-haiku-5-5` | Most tasks. |
 | `ANTHROPIC_MODEL_REVIEW` | `claude-haiku-5-5` | Image and video reviews. Switch to a stronger model here. |
-| `TYPESAFE_API_KEY` | — | Optional. Turns on [Jev](https://docs.typesafe.ai) decisions: a copy guardrail that catches paraphrased feel / fit / quality / deal claims in captions, on-screen texts and cover titles, and a **Recommended** version (with confidence) when a scene has several reviewed images or videos. Without it, the word-list rules and the review verdicts decide. Costs fractions of a cent. |
-| `JEV_MODEL` | `jev-latest` | Jev model id. |
+| `OPENAI_API_KEY` | — | Optional. Turns on [OpenAI's Decisions API](https://developers.openai.com/api/docs/guides/decisions) (GPT-6 Luna) for the app's yes/no and pick-one decisions, which look at the images: the **Recommended** version when a scene has several reviewed images or videos, the badge check on the composited frame, the cover frame, and a copy guardrail that catches paraphrased feel / fit / quality / deal claims. Prompts, reviews and all written text stay on Claude. Without a key, the review verdicts, Claude and the word-list rules decide. $0.10 per 1M input tokens, a fraction of a cent per Reel. |
+| `OPENAI_DECISION_MODEL` | `gpt-6-luna` | Decisions model id. |
 | `LLM_MODE` | `live` | `live` calls Claude. `mock` returns canned fixtures from `apps/api/test/fixtures/llm` (no key needed; tasks whose output depends on the project, such as image reviews, have no generic fixture). `record` calls Claude and saves each answer as a fixture. `replay` only uses saved fixtures. |
 | `DATA_DIR` | `./data` | Database, uploads, renders and logs. Relative to the repo root. |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Full paths if they aren't on your PATH. |

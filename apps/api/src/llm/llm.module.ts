@@ -3,7 +3,7 @@ import { APP_CONFIG, type AppConfig } from '../config/env';
 import { LLM_TRANSPORT, LlmService } from './llm.service';
 import { CopyGuardService } from './copy-guard.service';
 import { VersionPickService } from './version-pick.service';
-import { JevService } from './jev.service';
+import { DecisionService } from './decision.service';
 import { PromptService } from './prompt.service';
 import { FixtureTransport, LiveTransport, type LlmTransport } from './transport';
 
@@ -25,10 +25,10 @@ export function createTransport(config: AppConfig): LlmTransport {
     { provide: LLM_TRANSPORT, inject: [APP_CONFIG], useFactory: createTransport },
     { provide: PromptService, useFactory: () => new PromptService() },
     LlmService,
-    JevService,
+    DecisionService,
     CopyGuardService,
     VersionPickService,
   ],
-  exports: [LlmService, PromptService, JevService, CopyGuardService, VersionPickService],
+  exports: [LlmService, PromptService, DecisionService, CopyGuardService, VersionPickService],
 })
 export class LlmModule {}

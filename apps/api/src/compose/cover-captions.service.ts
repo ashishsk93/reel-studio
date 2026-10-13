@@ -19,6 +19,7 @@ import { personaOf } from '../influencers/influencer.mapper';
 import { productPriceLabel, sortProducts } from '../projects/project.mapper';
 import { JobsService } from '../jobs/jobs.service';
 import { CopyGuardService } from '../llm/copy-guard.service';
+import { DecisionService, type DecisionPart } from '../llm/decision.service';
 import { LlmService, type LlmPart } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -117,6 +118,7 @@ export class CoverCaptionsService implements OnModuleInit {
     private readonly product: ProductService,
     private readonly videos: VideoAssetsService,
     private readonly compose: ComposeService,
+    private readonly decisions: DecisionService,
   ) {}
 
   onModuleInit(): void {
@@ -201,7 +203,7 @@ export class CoverCaptionsService implements OnModuleInit {
       influencerId: inf.id,
     });
     const options = result.data.options.map((o) => o.trim());
-    // Drop options Jev reads as a feel / fit / quality / deal claim (keep them all if every one is flagged).
+    // Drop options the decision model reads as a feel / fit / quality / deal claim (keep them all if every one is flagged).
     const flagged = new Set((await this.copyGuard.check(options.map((text, i) => ({ key: String(i), text })), s.projectId)).map((f) => Number(f.key)));
     const clean = options.filter((_, i) => !flagged.has(i));
     return { segmentId, options: clean.length ? clean : options };
@@ -258,10 +260,25 @@ export class CoverCaptionsService implements OnModuleInit {
       }
     }
     const picked = candidates.slice(0, 12);
-    const parts: LlmPart[] = [];
-    for (const [i, c] of picked.entries()) {
-      parts.push({ type: 'image', path: await this.videos.frame(c.assetId, c.timeSec), label: `Candidate ${i + 1}: ${c.label}` });
-    }
+    const frames = await Promise.all(picked.map((c) => this.videos.frame(c.assetId, c.timeSec)));
+    const parts: LlmPart[] = picked.map((c, i) => ({ type: 'image', path: frames[i], label: `Candidate ${i + 1}: ${c.label}` }));
+    const decided = this.decisions.ask({
+      task: 'cover_pick',
+      input: [
+        { type: 'text', text: `Candidate cover frames for an Instagram fashion Reel: ${project.title}. The cover shows in the profile grid, cropped to 3:4 around the centre.` },
+        ...picked.map((c, i): DecisionPart => ({ type: 'image', path: frames[i], label: `Candidate ${i + 1}: ${c.label}` })),
+      ],
+      questions: [
+        {
+          type: 'choice',
+          name: 'cover',
+          instructions:
+            'Which frame makes the best cover? Her face clear and in focus with eyes open and a natural expression, the outfit clearly visible, sharp with no motion blur or artefacts, and a flattering, centred composition.',
+          choices: picked.map((c, i) => ({ value: String(i + 1), description: `Candidate ${i + 1}: ${c.label}` })),
+        },
+      ],
+      projectId,
+    });
     const result = await this.llm.call({
       task: 'cover_pick',
       schema: coverPickChecked(picked.length),
@@ -275,11 +292,16 @@ export class CoverCaptionsService implements OnModuleInit {
       influencerId: project.influencerId,
     });
     const prev = await this.coverState(projectId);
+    const cover = (await decided)?.get('cover');
+    const decidedBest = cover?.type === 'choice' ? Number(cover.choice) - 1 : -1;
+    const useDecision = cover?.type === 'choice' && decidedBest >= 0 && decidedBest < picked.length;
     const state: CoverState = {
       ...prev,
       candidates: picked,
-      best: result.data.best - 1,
-      reason: result.data.reason,
+      best: useDecision ? decidedBest : result.data.best - 1,
+      reason: useDecision
+        ? `Picked by the decision model (${Math.round((cover as { confidence: number }).confidence * 100)}% confident)${decidedBest === result.data.best - 1 ? '; Claude agrees' : `; Claude preferred candidate ${result.data.best}`}.`
+        : result.data.reason,
       titleOptions: await this.cleanTitles(result.data.titles.map((t) => t.trim()), projectId),
       chosen: null,
     };
@@ -317,7 +339,7 @@ export class CoverCaptionsService implements OnModuleInit {
     return { plain: c.plainPath, titled: c.titledPath };
   }
 
-  /** Cover titles without the ones Jev flags (all of them if every title is flagged). */
+  /** Cover titles without the ones the copy guardrail flags (all of them if every title is flagged). */
   private async cleanTitles(titles: string[], projectId: string): Promise<string[]> {
     const flagged = new Set((await this.copyGuard.check(titles.map((text, i) => ({ key: String(i), text })), projectId)).map((f) => Number(f.key)));
     const clean = titles.filter((_, i) => !flagged.has(i));
@@ -383,7 +405,7 @@ export class CoverCaptionsService implements OnModuleInit {
       projectId,
       influencerId: inf.id,
     });
-    // The word-list rules run inside the schema; Jev also catches paraphrased claims (one rewrite).
+    // The word-list rules run inside the schema; the decision model also catches paraphrased claims (one rewrite).
     let out = (await draft()).data;
     const lines = (o: typeof out) => [
       { key: 'hook', text: o.hook },
