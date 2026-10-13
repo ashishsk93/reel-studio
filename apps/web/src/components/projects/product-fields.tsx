@@ -140,7 +140,7 @@ export function FormatPicker({ value, onChange }: { value: StoryFormat; onChange
               selected ? "border-primary ring-2 ring-primary/40" : "hover:border-primary/50",
             )}
           >
-            <span className="flex items-center gap-2 text-sm font-semibold">
+            <span className="flex items-center gap-2 pr-6 text-sm font-semibold">
               <Icon className={cn("size-4", selected ? "text-primary" : "text-muted-foreground")} /> {rule.label}
             </span>
             <span className="text-xs text-muted-foreground">{rule.description}</span>

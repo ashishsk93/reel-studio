@@ -91,6 +91,13 @@ function StatusPanel() {
       <div className="px-2 text-xs text-muted-foreground">
         <span className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-500 align-middle" />
         Claude live · {data.modelDefault}
+        {data.jev && (
+          <>
+            <br />
+            <span className="mr-1.5 inline-block size-1.5 rounded-full bg-sky-500 align-middle" />
+            Jev decisions on
+          </>
+        )}
       </div>
     );
   }

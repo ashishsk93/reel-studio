@@ -1,3 +1,4 @@
+import { VersionPickService } from '../llm/version-pick.service';
 import path from 'node:path';
 import { BadRequestException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
@@ -110,6 +111,7 @@ export class VideoAssetsService implements OnModuleInit {
     private readonly product: ProductService,
     private readonly media: MediaService,
     private readonly video: VideoService,
+    private readonly versionPick: VersionPickService,
   ) {}
 
   onModuleInit(): void {
@@ -603,6 +605,7 @@ export class VideoAssetsService implements OnModuleInit {
     });
     await this.prisma.asset.update({ where: { id: assetId }, data: { shotBounds: toJson(updatedBounds) } });
     if (asset.status === 'approved') await this.syncSegments(job.projectId);
+    await this.versionPick.refreshVideoJob(job.id);
     return review.id;
   }
 
@@ -622,6 +625,7 @@ export class VideoAssetsService implements OnModuleInit {
     const asset = await this.findVideo(assetId);
     await this.prisma.asset.update({ where: { id: assetId }, data: { status: 'rejected' } });
     if (asset.status === 'approved') await this.syncSegments(asset.projectId!);
+    await this.versionPick.refreshVideoJob(asset.videoJobId!);
   }
 
   async remove(assetId: string): Promise<void> {
@@ -631,6 +635,7 @@ export class VideoAssetsService implements OnModuleInit {
     await this.storage.remove(asset.normalizedPath);
     await this.storage.removeDir(`projects/${asset.projectId}/frames/${asset.id}`);
     await this.syncSegments(asset.projectId!);
+    await this.versionPick.refreshVideoJob(asset.videoJobId!);
   }
 
   async updateBounds(assetId: string, body: ShotBoundsUpdate): Promise<void> {

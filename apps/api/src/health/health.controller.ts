@@ -17,6 +17,7 @@ export class HealthController {
       ok: true,
       llmMode: this.config.llmMode,
       hasApiKey: Boolean(this.config.anthropicApiKey),
+      jev: Boolean(this.config.jevApiKey) && this.config.llmMode !== 'mock' && this.config.llmMode !== 'replay',
       ffmpeg: this.tools.ffmpeg,
       ffprobe: this.tools.ffprobe,
       dataDir: this.config.dataDir,

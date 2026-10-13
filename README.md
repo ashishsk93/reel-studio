@@ -41,6 +41,8 @@ Not in the repository (git-ignored), so a fresh clone needs them: `.env` (your k
 | `ANTHROPIC_API_KEY` | — | Required when `LLM_MODE` is `live` or `record`. |
 | `ANTHROPIC_MODEL_DEFAULT` | `claude-haiku-5-5` | Most tasks. |
 | `ANTHROPIC_MODEL_REVIEW` | `claude-haiku-5-5` | Image and video reviews. Switch to a stronger model here. |
+| `TYPESAFE_API_KEY` | — | Optional. Turns on [Jev](https://docs.typesafe.ai) decisions: a copy guardrail that catches paraphrased feel / fit / quality / deal claims in captions, on-screen texts and cover titles, and a **Recommended** version (with confidence) when a scene has several reviewed images or videos. Without it, the word-list rules and the review verdicts decide. Costs fractions of a cent. |
+| `JEV_MODEL` | `jev-latest` | Jev model id. |
 | `LLM_MODE` | `live` | `live` calls Claude. `mock` returns canned fixtures from `apps/api/test/fixtures/llm` (no key needed; tasks whose output depends on the project, such as image reviews, have no generic fixture). `record` calls Claude and saves each answer as a fixture. `replay` only uses saved fixtures. |
 | `DATA_DIR` | `./data` | Database, uploads, renders and logs. Relative to the repo root. |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Full paths if they aren't on your PATH. |
@@ -64,6 +66,20 @@ Overlay text is rendered with `@napi-rs/canvas`. Put these in `apps/api/assets/f
 
 - **Poppins ExtraBold** (`Poppins-ExtraBold.ttf`) from Google Fonts: https://fonts.google.com/specimen/Poppins
 - **Noto Color Emoji** (`NotoColorEmoji.ttf`): https://fonts.google.com/noto/specimen/Noto+Color+Emoji
+
+## Story formats
+
+Pick one when creating a project (details in [docs/formats.md](docs/formats.md)):
+
+| Format | Products | The Reel |
+|---|---|---|
+| Classic | 1 | Unboxing, hold up, details, then wearing it |
+| Price-cap haul | 2–5 | Title hook, then a quick try-on of each product with its own store and price badge |
+| Occasion edit | 2–5 | Same, themed by occasion ("3 Diwali looks") |
+| Outfit transition | 1–3 | Her own clothes → a quick spin or hand-across-lens → wearing it (Kling start + end frames) |
+| One piece, 3 ways | 1 | The same piece styled for three occasions |
+
+Each product has its own photos, analysis, store, price, links and an optional on-screen note. Captions list every product with its price, and the LINK DM lists every link.
 
 ## Making a Reel (steps 1–8)
 

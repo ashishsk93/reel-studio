@@ -94,7 +94,8 @@ export const ProjectCreateFieldsSchema = ProjectFieldsSchema.extend({
 /** Multipart add-product: the product fields plus its photos and their `roles`. */
 export const ProductCreateFieldsSchema = ProductFieldsSchema.extend({ roles: rolesField });
 
-export const ProjectUpdateSchema = ProjectFieldsSchema.partial();
+/** No default format here: a partial update must never reset it to classic. */
+export const ProjectUpdateSchema = ProjectFieldsSchema.extend({ format: z.enum(STORY_FORMATS) }).partial();
 export type ProjectUpdate = z.output<typeof ProjectUpdateSchema>;
 
 export const ProjectGotoSchema = z.object({ status: z.enum(PROJECT_STATUSES) });

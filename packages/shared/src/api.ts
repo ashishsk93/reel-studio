@@ -285,6 +285,8 @@ export interface HealthDto {
   ok: boolean;
   llmMode: string;
   hasApiKey: boolean;
+  /** The Jev decision model is configured (TYPESAFE_API_KEY) and used. */
+  jev: boolean;
   ffmpeg: string | null;
   ffprobe: string | null;
   dataDir: string;
@@ -342,10 +344,21 @@ export interface AssetDto {
   reviewJob: { id: string; status: JobStatus; error: string | null } | null;
 }
 
+/** The version to approve among several reviewed ones (Jev's pick, or the rules' as fallback). */
+export interface VersionPickDto {
+  assetId: string;
+  version: number;
+  /** Jev's confidence (0–1); null when the rules decided. */
+  confidence: number | null;
+  by: 'jev' | 'rules';
+  note: string;
+}
+
 export interface SceneImagesDto {
   scene: SceneDto;
   assets: AssetDto[];
   approvedAssetId: string | null;
+  recommendation: VersionPickDto | null;
 }
 
 export interface ImagesStepDto {
@@ -497,6 +510,7 @@ export interface VideoJobDto {
   zipUrl: string;
   assets: VideoAssetDto[];
   approvedAssetId: string | null;
+  recommendation: VersionPickDto | null;
 }
 
 export interface SegmentDto {

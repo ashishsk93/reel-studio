@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { advance, canOpenStep, isStepDone } from './steps.js';
-import { ProjectCreateFieldsSchema, ProductUpdateSchema } from './schemas/project.js';
+import { ProjectCreateFieldsSchema, ProductUpdateSchema, ProjectUpdateSchema } from './schemas/project.js';
 import { ProductAnalysisChecked } from './llm/product.js';
 
 describe('status machine', () => {
@@ -39,6 +39,10 @@ describe('project schemas', () => {
     expect(create({}, [{ ...product, priceInr: '0' }]).success).toBe(false);
     expect(create({ roles: '["side"]' }).success).toBe(false);
     expect(ProductUpdateSchema.parse({ affiliateLink: '' }).affiliateLink).toBeNull();
+  });
+
+  it('never resets the format on a partial update', () => {
+    expect(ProjectUpdateSchema.parse({ title: 'x' })).toEqual({ title: 'x' });
   });
 
   it('checks the product count against the format', () => {

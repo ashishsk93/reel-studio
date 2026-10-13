@@ -1,3 +1,4 @@
+import { VersionPickService } from '../llm/version-pick.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 import {
@@ -84,6 +85,7 @@ export class VideoService implements OnModuleInit {
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly projects: ProjectsService,
+    private readonly versionPick: VersionPickService,
   ) {}
 
   onModuleInit(): void {
@@ -252,6 +254,7 @@ export class VideoService implements OnModuleInit {
       zipUrl: this.storage.apiUrl(`/video-jobs/${job.id}/attachments.zip`),
       assets,
       approvedAssetId: assets.find((a) => a.status === 'approved')?.id ?? null,
+      recommendation: assets.some((a) => a.status === 'approved') ? null : this.versionPick.read(job.recommendation),
     };
   }
 

@@ -13,3 +13,6 @@ apps/api/src/generated/
 
 # Local reference material, not part of the app
 Old Data/
+
+# Local dev server logs
+*.log

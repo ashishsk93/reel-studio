@@ -216,6 +216,7 @@ model Scene {
   attachments       Json // AttachmentRef[]
   motion            String
   backgroundId      String? // ReferenceImage tagged "background" attached as the setting
+  recommendation    Json? // the version to approve (Jev, or rules as fallback); refreshed after each review
   approvedAssetId   String?  @unique
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -296,6 +297,7 @@ model VideoJob {
   promptOverride Boolean  @default(false) // prompt edited by hand or rewritten by Claude; don't rebuild
   startAssetId   String
   endAssetId     String? // transitions: the Kling end frame
+  recommendation Json? // the version to approve (Jev, or rules as fallback); refreshed after each review
   extraRefs      Json // AttachmentRef[]
   expectedShots  Json // { sceneId, start, end, text }[]
   settings       Json

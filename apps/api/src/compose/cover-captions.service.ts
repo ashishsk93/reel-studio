@@ -18,6 +18,7 @@ import { personaBlock, productBlock } from '../assets/asset-context.service';
 import { personaOf } from '../influencers/influencer.mapper';
 import { productPriceLabel, sortProducts } from '../projects/project.mapper';
 import { JobsService } from '../jobs/jobs.service';
+import { CopyGuardService } from '../llm/copy-guard.service';
 import { LlmService, type LlmPart } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -106,6 +107,7 @@ export function assembleDm(message: string, link: string | null, disclosure: str
 @Injectable()
 export class CoverCaptionsService implements OnModuleInit {
   constructor(
+    private readonly copyGuard: CopyGuardService,
     private readonly prisma: PrismaService,
     private readonly jobs: JobsService,
     private readonly llm: LlmService,
@@ -198,7 +200,11 @@ export class CoverCaptionsService implements OnModuleInit {
       projectId: s.projectId,
       influencerId: inf.id,
     });
-    return { segmentId, options: result.data.options.map((o) => o.trim()) };
+    const options = result.data.options.map((o) => o.trim());
+    // Drop options Jev reads as a feel / fit / quality / deal claim (keep them all if every one is flagged).
+    const flagged = new Set((await this.copyGuard.check(options.map((text, i) => ({ key: String(i), text })), s.projectId)).map((f) => Number(f.key)));
+    const clean = options.filter((_, i) => !flagged.has(i));
+    return { segmentId, options: clean.length ? clean : options };
   }
 
   // ---------- cover ----------
@@ -274,7 +280,7 @@ export class CoverCaptionsService implements OnModuleInit {
       candidates: picked,
       best: result.data.best - 1,
       reason: result.data.reason,
-      titleOptions: result.data.titles.map((t) => t.trim()),
+      titleOptions: await this.cleanTitles(result.data.titles.map((t) => t.trim()), projectId),
       chosen: null,
     };
     await this.prisma.composition.update({ where: { projectId }, data: { cover: toJson(state) } });
@@ -311,6 +317,13 @@ export class CoverCaptionsService implements OnModuleInit {
     return { plain: c.plainPath, titled: c.titledPath };
   }
 
+  /** Cover titles without the ones Jev flags (all of them if every title is flagged). */
+  private async cleanTitles(titles: string[], projectId: string): Promise<string[]> {
+    const flagged = new Set((await this.copyGuard.check(titles.map((text, i) => ({ key: String(i), text })), projectId)).map((f) => Number(f.key)));
+    const clean = titles.filter((_, i) => !flagged.has(i));
+    return clean.length ? clean : titles;
+  }
+
   // ---------- captions ----------
 
   toCaptionsDto(row: CaptionPackage | null): CaptionPackageDto | null {
@@ -344,7 +357,7 @@ export class CoverCaptionsService implements OnModuleInit {
     const requiredTags = [BRAND_TAG, inf.hashtag].filter(Boolean);
     const segments = await this.compose.segments(projectId);
 
-    const result = await this.llm.call({
+    const draft = (feedback?: string) => this.llm.call({
       task: 'captions',
       schema: captionsChecked(requiredTags),
       system: [
@@ -363,14 +376,23 @@ export class CoverCaptionsService implements OnModuleInit {
             `Required hashtags: ${requiredTags.join(' ')}`,
             `On-screen texts in the Reel: ${segments.map((s) => `"${s.onScreenText}"`).join(', ')}`,
             '',
-            'Write the caption package.',
+            feedback ? `Your last draft broke the copy rules: ${feedback}. Write the package again without those claims.` : 'Write the caption package.',
           ].join('\n'),
         },
       ],
       projectId,
       influencerId: inf.id,
     });
-    const out = result.data;
+    // The word-list rules run inside the schema; Jev also catches paraphrased claims (one rewrite).
+    let out = (await draft()).data;
+    const lines = (o: typeof out) => [
+      { key: 'hook', text: o.hook },
+      ...o.outfitLines.map((text, i) => ({ key: `line${i}`, text })),
+      { key: 'firstComment', text: o.firstComment ?? '' },
+      { key: 'dm', text: o.dmMessage },
+    ];
+    const flags = await this.copyGuard.check(lines(out), projectId);
+    if (flags.length) out = (await draft(flags.map((f) => f.message).join('; '))).data;
     const hashtags = [...new Set(out.hashtags.map((h) => h.trim()))];
     const data = {
       caption: assembleCaption(

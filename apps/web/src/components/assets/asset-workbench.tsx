@@ -4,7 +4,7 @@ import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, Columns3, ImagePlus, Loader2, RefreshCw, ScanFace, Sparkles, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import type { AssetDto, Box, JobDto } from "@reel/shared";
+import type { AssetDto, Box, JobDto, VersionPickDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { AssistantPanel } from "@/components/assets/assistant-panel";
+import { RecommendationNote, RecommendedStar } from "@/components/assets/recommendation";
 import { CompareDialog, ZoomImage, type CompareImage } from "@/components/assets/compare-view";
 import { ReviewCard, VERDICT_STYLE } from "@/components/assets/review-card";
 import { api, errorMessage } from "@/lib/api";
@@ -37,8 +38,11 @@ export function AssetWorkbench({
   aspect = "9/16",
   disabled,
   emptyHint,
+  recommendation,
 }: {
   assets: AssetDto[];
+  /** The version to approve, when several are reviewed and none is approved yet. */
+  recommendation?: VersionPickDto | null;
   /** POST endpoint taking multipart `files`. */
   uploadPath: string;
   compare: CompareImage[];
@@ -73,11 +77,21 @@ export function AssetWorkbench({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-2">
         {assets.map((a) => (
-          <VersionThumb key={a.id} asset={a} active={a.id === selected?.id} aspect={aspect} onClick={() => setSelectedId(a.id)} />
+          <VersionThumb
+            key={a.id}
+            asset={a}
+            active={a.id === selected?.id}
+            aspect={aspect}
+            recommended={a.id === recommendation?.assetId}
+            onClick={() => setSelectedId(a.id)}
+          />
         ))}
         {disabled ? null : <UploadTile aspect={aspect} pending={upload.isPending} onFiles={(f) => upload.mutate(f)} big={assets.length === 0} />}
       </div>
 
+      {recommendation && assets.some((a) => a.id === recommendation.assetId) && (
+        <RecommendationNote pick={recommendation} onSelect={() => setSelectedId(recommendation.assetId)} />
+      )}
       {disabled && <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{disabled}</div>}
       {!disabled && assets.length === 0 && emptyHint && <div className="text-sm text-muted-foreground">{emptyHint}</div>}
 
@@ -88,7 +102,19 @@ export function AssetWorkbench({
   );
 }
 
-function VersionThumb({ asset, active, aspect, onClick }: { asset: AssetDto; active: boolean; aspect: string; onClick: () => void }) {
+function VersionThumb({
+  asset,
+  active,
+  aspect,
+  recommended,
+  onClick,
+}: {
+  asset: AssetDto;
+  active: boolean;
+  aspect: string;
+  recommended: boolean;
+  onClick: () => void;
+}) {
   const verdict = asset.review?.verdict;
   const reviewing = asset.reviewJob && asset.reviewJob.status !== "failed";
   return (
@@ -108,6 +134,7 @@ function VersionThumb({ asset, active, aspect, onClick }: { asset: AssetDto; act
       <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">v{asset.version}</span>
       {asset.status === "approved" && <CheckCircle2 className="absolute top-0.5 right-0.5 size-4 rounded-full bg-white text-primary" />}
       {asset.status === "rejected" && <XCircle className="absolute top-0.5 right-0.5 size-4 rounded-full bg-white text-destructive" />}
+      {recommended && <RecommendedStar />}
       {reviewing ? (
         <Loader2 className="absolute top-0.5 left-0.5 size-3.5 animate-spin text-white drop-shadow" />
       ) : (

@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
+import { VersionPickService } from '../llm/version-pick.service';
 import { REF_TAGS, type AssetDto, type ImagesStepDto, type JobDto } from '@reel/shared';
 import type { Asset } from '../generated/prisma/client';
 import { readJson } from '../common/json';
@@ -29,6 +30,7 @@ export class AssetsService {
     private readonly influencers: InfluencersService,
     private readonly reviews: ReviewService,
     private readonly videos: VideoAssetsService,
+    private readonly versionPick: VersionPickService,
   ) {}
 
   // ---------- reads ----------
@@ -46,6 +48,7 @@ export class AssetsService {
         scene: dto,
         assets: scene.assets.map((a) => toAssetDto(a, jobs.get(a.id), this.storage)),
         approvedAssetId: scene.approvedAssetId,
+        recommendation: scene.approvedAssetId ? null : this.versionPick.read(scene.recommendation),
       };
     });
     return { scenes: result, approved: result.filter((s) => s.approvedAssetId).length, total: result.length };
@@ -182,6 +185,7 @@ export class AssetsService {
     }
     await this.prisma.asset.update({ where: { id: assetId }, data: { status: 'rejected' } });
     if (asset.status === 'approved') await this.unapprove(asset);
+    if (asset.sceneId) await this.versionPick.refreshScene(asset.sceneId);
     return this.get(assetId);
   }
 
@@ -191,6 +195,7 @@ export class AssetsService {
     if (asset.status === 'approved') await this.unapprove(asset);
     await this.prisma.asset.delete({ where: { id: assetId } });
     await this.storage.remove(asset.path);
+    if (asset.sceneId) await this.versionPick.refreshScene(asset.sceneId);
   }
 
   // ---------- helpers ----------

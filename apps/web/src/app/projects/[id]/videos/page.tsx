@@ -41,6 +41,7 @@ import { JobCard } from "@/components/video/job-card";
 import { TimelineEditor } from "@/components/video/timeline-editor";
 import { VideoReviewCard } from "@/components/video/video-review-card";
 import { AssistantPanel } from "@/components/assets/assistant-panel";
+import { RecommendationNote, RecommendedStar } from "@/components/assets/recommendation";
 import { api, errorMessage } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
 import { projectKeys, useVideoStep } from "@/lib/queries";
@@ -217,10 +218,11 @@ function JobVideos({
 
       <div className="flex flex-wrap items-end gap-2">
         {job.assets.map((a) => (
-          <VersionChip key={a.id} asset={a} active={a.id === selected?.id} onClick={() => setSelectedId(a.id)} />
+          <VersionChip key={a.id} asset={a} active={a.id === selected?.id} recommended={a.id === job.recommendation?.assetId} onClick={() => setSelectedId(a.id)} />
         ))}
         <VideoDrop pending={upload.isPending} onFile={(f) => upload.mutate(f)} big={job.assets.length === 0} />
       </div>
+      {job.recommendation && <RecommendationNote pick={job.recommendation} onSelect={() => setSelectedId(job.recommendation!.assetId)} />}
 
       {selected && (
         <VideoDetail key={selected.id} asset={selected} job={job} sceneLabel={sceneLabel} onChanged={onChanged} />
@@ -229,7 +231,7 @@ function JobVideos({
   );
 }
 
-function VersionChip({ asset, active, onClick }: { asset: VideoAssetDto; active: boolean; onClick: () => void }) {
+function VersionChip({ asset, active, recommended, onClick }: { asset: VideoAssetDto; active: boolean; recommended: boolean; onClick: () => void }) {
   const thumb = asset.frames[0]?.url;
   const verdict = asset.review?.verdict;
   return (
@@ -252,6 +254,7 @@ function VersionChip({ asset, active, onClick }: { asset: VideoAssetDto; active:
       <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[10px] font-semibold text-white">v{asset.version}</span>
       {asset.status === "approved" && <CheckCircle2 className="absolute top-0.5 right-0.5 size-4 rounded-full bg-white text-primary" />}
       {asset.status === "rejected" && <XCircle className="absolute top-0.5 right-0.5 size-4 rounded-full bg-white text-destructive" />}
+      {recommended && <RecommendedStar />}
       {asset.processing && asset.processing.status !== "failed" ? (
         <Loader2 className="absolute top-0.5 left-0.5 size-3.5 animate-spin text-white drop-shadow" />
       ) : (

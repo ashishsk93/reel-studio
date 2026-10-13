@@ -1,3 +1,4 @@
+import { VersionPickService } from '../llm/version-pick.service';
 import { Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 import {
@@ -50,6 +51,7 @@ export class ReviewService implements OnModuleInit {
     private readonly prompts: PromptService,
     private readonly settings: SettingsService,
     private readonly context: AssetContextService,
+    private readonly versionPick: VersionPickService,
   ) {}
 
   onModuleInit(): void {
@@ -146,6 +148,7 @@ export class ReviewService implements OnModuleInit {
         llmCallId: result.callId,
       },
     });
+    if (asset.sceneId) await this.versionPick.refreshScene(asset.sceneId);
     return review.id;
   }
 }

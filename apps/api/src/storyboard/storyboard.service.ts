@@ -35,6 +35,7 @@ import type { Scene } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { personaOf, refTags } from '../influencers/influencer.mapper';
 import { JobsService } from '../jobs/jobs.service';
+import { CopyGuardService } from '../llm/copy-guard.service';
 import { LlmService } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -107,6 +108,7 @@ export class StoryboardService implements OnModuleInit {
     private readonly storage: StorageService,
     private readonly projects: ProjectsService,
     private readonly product: ProductService,
+    private readonly copyGuard: CopyGuardService,
   ) {}
 
   onModuleInit(): void {
@@ -272,13 +274,16 @@ export class StoryboardService implements OnModuleInit {
 
     const scenes = result.data.scenes.map((scene) => this.fromLlm(ctx, scene));
     const built = scenes.map((scene) => this.buildFromFields(ctx, scene));
+    // Jev's copy guardrail: flagged on-screen texts become notes to fix (Compose → New text).
+    const flags = await this.copyGuard.check(scenes.map((s, i) => ({ key: String(i), text: s.onScreenText })), projectId);
+    const notes = [...result.data.notes, ...flags.map((f) => `Scene ${Number(f.key) + 1}: ${f.message}; change it before rendering.`)];
     const replaced = await this.prisma.scene.findMany({ where: { projectId }, select: { id: true } });
     await this.prisma.$transaction(async (tx) => {
       await tx.scene.deleteMany({ where: { projectId } });
       for (const [order, scene] of scenes.entries()) {
         await tx.scene.create({ data: { projectId, order, ...this.columns(scene, built[order]) } });
       }
-      await tx.project.update({ where: { id: projectId }, data: { storyboardNotes: toJson(result.data.notes) } });
+      await tx.project.update({ where: { id: projectId }, data: { storyboardNotes: toJson(notes) } });
     });
     // Uploads of the replaced scenes were deleted with them (the user confirmed); remove their files too.
     for (const { id } of replaced) await this.storage.removeDir(`projects/${projectId}/scenes/${id}`);

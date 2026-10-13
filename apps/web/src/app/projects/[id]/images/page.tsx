@@ -181,6 +181,7 @@ function SceneImages({ item, projectId, onChanged }: { item: SceneImagesDto; pro
 
       <AssetWorkbench
         assets={item.assets}
+        recommendation={item.recommendation}
         uploadPath={`/scenes/${scene.id}/assets`}
         compare={compare}
         onChanged={onChanged}

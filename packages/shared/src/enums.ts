@@ -96,6 +96,9 @@ export const LLM_TASKS = [
   'detail_regions',
   'placement_check',
   'scene_text',
+  // Jev decisions (TypeSafe)
+  'copy_guard',
+  'version_pick',
   'cover_pick',
   'captions',
 ] as const;

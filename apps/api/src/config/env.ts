@@ -14,6 +14,9 @@ export interface AppConfig {
   modelDefault: string;
   modelReview: string;
   llmMode: LlmMode;
+  jevApiKey: string;
+  jevModel: string;
+  jevApiUrl: string;
   fixturesDir: string;
   ffmpegPath: string;
   ffprobePath: string;
@@ -29,6 +32,10 @@ const EnvSchema = z.object({
   ANTHROPIC_MODEL_DEFAULT: z.string().trim().min(1).default('claude-haiku-5-5'),
   ANTHROPIC_MODEL_REVIEW: z.string().trim().min(1).default('claude-haiku-5-5'),
   LLM_MODE: z.enum(LLM_MODES).default('live'),
+  /** Optional: TypeSafe's Jev decision model (copy guardrail, best-version pick). Off when blank. */
+  TYPESAFE_API_KEY: z.string().trim().default(''),
+  JEV_MODEL: z.string().trim().min(1).default('jev-latest'),
+  JEV_API_URL: z.string().trim().url().default('https://api.typesafe.ai'),
   LLM_FIXTURES_DIR: z.string().trim().optional(),
   DATA_DIR: z.string().trim().default('./data'),
   DATABASE_URL: z.string().trim().optional(),
@@ -76,6 +83,9 @@ export function loadConfig(options: { repoRoot?: string; env?: NodeJS.ProcessEnv
     modelDefault: env.ANTHROPIC_MODEL_DEFAULT,
     modelReview: env.ANTHROPIC_MODEL_REVIEW,
     llmMode: env.LLM_MODE,
+    jevApiKey: env.TYPESAFE_API_KEY,
+    jevModel: env.JEV_MODEL,
+    jevApiUrl: env.JEV_API_URL.replace(/\/$/, ''),
     fixturesDir: path.resolve(repoRoot, env.LLM_FIXTURES_DIR ?? 'apps/api/test/fixtures/llm'),
     ffmpegPath: env.FFMPEG_PATH,
     ffprobePath: env.FFPROBE_PATH,
