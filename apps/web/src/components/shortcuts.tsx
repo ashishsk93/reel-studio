@@ -27,12 +27,13 @@ function onScreen(el: Element): boolean {
   return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
 }
 
-/** The copy target the user means: the one under the mouse, else the first visible one. */
+/** The copy target the user means: the one under the mouse, else the first visible one, else the first on the page. */
 function target(selector: string): HTMLElement | null {
   const hovered = [...document.querySelectorAll(":hover")].pop();
   const near = hovered?.closest<HTMLElement>(selector);
   if (near) return near;
-  return [...document.querySelectorAll<HTMLElement>(selector)].find(onScreen) ?? null;
+  const all = [...document.querySelectorAll<HTMLElement>(selector)];
+  return all.find(onScreen) ?? all[0] ?? null;
 }
 
 function copyNow(): void {
