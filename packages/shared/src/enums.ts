@@ -50,8 +50,17 @@ export const SCENE_TYPES = [
   'wearing_front',
   'wearing_alt',
   'custom',
+  // Multi-product and styling formats (docs/formats.md)
+  'hook',
+  'try_on',
+  'styled',
+  'transition_before',
+  'transition_after',
 ] as const;
 export type SceneType = (typeof SCENE_TYPES)[number];
+
+export const STORY_FORMATS = ['classic', 'haul', 'occasion', 'transition', 'three_ways'] as const;
+export type StoryFormat = (typeof STORY_FORMATS)[number];
 
 export const OUTFIT_STATES = ['own_clothes', 'wearing_product'] as const;
 export type OutfitState = (typeof OUTFIT_STATES)[number];

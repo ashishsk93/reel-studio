@@ -8,7 +8,9 @@ import {
   PROJECT_STATUSES,
   SCENE_TYPES,
   SHOT_KINDS,
+  STORY_FORMATS,
 } from '../enums.js';
+import { FORMATS } from '../formats.js';
 
 /** Blank clears the field (null). */
 const optionalUrl = z
@@ -19,33 +21,78 @@ const optionalUrl = z
   .nullable()
   .optional();
 
-export const ProjectFieldsSchema = z.object({
-  influencerId: z.string().min(1, 'Pick an influencer'),
-  sourceId: z.string().min(1, 'Pick a source'),
-  productTitle: z.string().trim().min(1, 'Required'),
+/** One product of a project: what the badge, captions and DM need. */
+export const ProductFieldsSchema = z.object({
+  title: z.string().trim().min(1, 'Required'),
+  sourceId: z.string().min(1, 'Pick a store'),
   priceInr: z.coerce.number().int('Whole rupees').positive('Enter the price'),
   priceModeOverride: z.enum(PRICE_MODES).nullable().optional(),
   productUrl: optionalUrl,
   affiliateLink: optionalUrl,
+  note: z.string().trim().max(60, 'Keep it short: it is shown on screen').default(''),
+});
+export type ProductFields = z.input<typeof ProductFieldsSchema>;
+
+export const ProductUpdateSchema = ProductFieldsSchema.partial();
+export type ProductUpdate = z.output<typeof ProductUpdateSchema>;
+
+export const ProjectFieldsSchema = z.object({
+  influencerId: z.string().min(1, 'Pick an influencer'),
+  format: z.enum(STORY_FORMATS).default('classic'),
+  title: z.string().trim().min(1, 'Required'),
   occasion: z.string().trim().min(1, 'Required, e.g. "Diwali party"'),
 });
 export type ProjectFields = z.input<typeof ProjectFieldsSchema>;
 
-/** Multipart create: the fields plus a JSON array of roles, one per uploaded file. */
+/** A JSON-encoded multipart field. */
+const jsonField = <T extends z.ZodType>(schema: T, what: string) =>
+  z.string().transform((value, ctx): z.output<T> => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      ctx.addIssue({ code: 'custom', message: `${what} must be JSON` });
+      return z.NEVER;
+    }
+    const result = schema.safeParse(parsed);
+    if (!result.success) {
+      for (const issue of result.error.issues) ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+      return z.NEVER;
+    }
+    return result.data;
+  });
+
+const rolesField = z
+  .string()
+  .optional()
+  .transform((value, ctx) => {
+    if (!value) return [];
+    try {
+      return z.array(z.enum(PRODUCT_IMAGE_ROLES)).parse(JSON.parse(value));
+    } catch {
+      ctx.addIssue({ code: 'custom', message: `roles must be a JSON array of: ${PRODUCT_IMAGE_ROLES.join(', ')}` });
+      return z.NEVER;
+    }
+  });
+
+/**
+ * Multipart create: the project fields, `products` (JSON array, each with `imageCount`), and the
+ * `images` files in product order with `roles` (JSON array, one per file).
+ */
 export const ProjectCreateFieldsSchema = ProjectFieldsSchema.extend({
-  roles: z
-    .string()
-    .optional()
-    .transform((value, ctx) => {
-      if (!value) return [];
-      try {
-        return z.array(z.enum(PRODUCT_IMAGE_ROLES)).parse(JSON.parse(value));
-      } catch {
-        ctx.addIssue({ code: 'custom', message: `roles must be a JSON array of: ${PRODUCT_IMAGE_ROLES.join(', ')}` });
-        return z.NEVER;
-      }
-    }),
+  products: jsonField(z.array(ProductFieldsSchema.extend({ imageCount: z.number().int().min(1, 'Add at least one photo') })).min(1), 'products'),
+  roles: rolesField,
+}).superRefine((data, ctx) => {
+  const rule = FORMATS[data.format];
+  const n = data.products.length;
+  if (n < rule.products.min || n > rule.products.max) {
+    const range = rule.products.min === rule.products.max ? `${rule.products.min}` : `${rule.products.min}–${rule.products.max}`;
+    ctx.addIssue({ code: 'custom', path: ['products'], message: `${rule.label} takes ${range} product${rule.products.max > 1 ? 's' : ''} (got ${n})` });
+  }
 });
+
+/** Multipart add-product: the product fields plus its photos and their `roles`. */
+export const ProductCreateFieldsSchema = ProductFieldsSchema.extend({ roles: rolesField });
 
 export const ProjectUpdateSchema = ProjectFieldsSchema.partial();
 export type ProjectUpdate = z.output<typeof ProjectUpdateSchema>;
@@ -57,7 +104,7 @@ export const ProductImageUpdateSchema = z.object({
 });
 
 export const ProductImagesUploadFieldsSchema = z.object({
-  roles: ProjectCreateFieldsSchema.shape.roles,
+  roles: rolesField,
 });
 
 export const IdOrderSchema = z.object({ ids: z.array(z.string()).min(1) });
@@ -85,6 +132,8 @@ export const SceneEditableSchema = z.object({
   motion: z.string().trim(),
   /** One of the influencer's background references (her room), attached so the setting stays the same. */
   backgroundId: z.string().nullable().default(null),
+  /** The product this scene shows; null for a hook that shows none. */
+  productId: z.string().nullable().default(null),
 });
 export type SceneEditable = z.infer<typeof SceneEditableSchema>;
 

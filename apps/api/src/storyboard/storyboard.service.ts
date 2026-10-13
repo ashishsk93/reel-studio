@@ -7,11 +7,14 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import {
+  FORMATS,
   IMAGE_MODELS,
   OUTFIT_STATES,
   PRODUCT_IMAGE_ROLES,
   SCENE_TYPES,
   SHOT_KINDS,
+  STORY_FORMATS,
+  hasSegment,
   sceneReviseChecked,
   storyboardChecked,
   type BackgroundDto,
@@ -23,6 +26,7 @@ import {
   type SceneDto,
   type SceneEditable,
   type SceneUpdate,
+  type StoryFormat,
   type StoryboardConstraints,
   type StoryboardDto,
   type StoryboardScene,
@@ -35,10 +39,11 @@ import { LlmService } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductService } from '../product/product.service';
+import { productPriceLabel, sortProducts } from '../projects/project.mapper';
 import { ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
-import { PlaceholderError, buildImagePrompt, type PromptPersona } from './prompt-builder';
+import { PlaceholderError, buildImagePrompt, templateFor, type PromptPersona } from './prompt-builder';
 import { selectAttachments, type ProductCandidate, type RefCandidate, type RefRules, type SelectedAttachment } from './reference-rules';
 
 export const STORYBOARD_JOB = 'storyboard.generate';
@@ -47,12 +52,23 @@ export const SCENE_REVISE_JOB = 'scene.revise';
 const GeneratePayload = z.object({ projectId: z.string(), instruction: z.string().optional() });
 const RevisePayload = z.object({ sceneId: z.string(), instruction: z.string().optional() });
 
-/** Reel length incl. the CTA, from the brief. */
-const REEL_MIN_SEC = 16;
-const REEL_MAX_SEC = 20;
+/** A product of the project as the storyboard sees it (numbered 1..N). */
+interface BoardProduct {
+  id: string;
+  number: number;
+  title: string;
+  note: string;
+  store: string;
+  priceLabel: string | null;
+  images: ProductCandidate[];
+  spec: ProductSpecDto;
+}
 
 interface BoardContext {
   projectId: string;
+  format: StoryFormat;
+  title: string;
+  occasion: string;
   persona: PromptPersona & {
     age: number;
     city: string;
@@ -66,8 +82,9 @@ interface BoardContext {
   references: RefCandidate[];
   /** Her places: references tagged "background", numbered 1.. in this order for the storyboard. */
   backgrounds: Array<RefCandidate & { note: string }>;
-  products: ProductCandidate[];
-  spec: ProductSpecDto;
+  products: BoardProduct[];
+  /** Current scenes, for transition pose references. */
+  scenes: Array<{ id: string; order: number; type: string; productId: string | null; approved: { id: string; path: string } | null }>;
   rules: RefRules;
   maxRefs: Record<string, number>;
   ctaSec: number;
@@ -130,8 +147,9 @@ export class StoryboardService implements OnModuleInit {
       backgrounds: ctx.backgrounds.map(
         (b, i): BackgroundDto => ({ id: b.id, number: i + 1, note: b.note, url: this.storage.url(b.path) ?? '' }),
       ),
+      products: ctx.products.map((p) => ({ id: p.id, number: p.number, title: p.title, priceLabel: p.priceLabel })),
       notes: readJson(z.array(z.string()), project.storyboardNotes, []),
-      totalSec: Math.round(scenes.reduce((sum, s) => sum + s.targetDurationSec, 0) * 10) / 10,
+      totalSec: Math.round(scenes.filter((s) => hasSegment(s.type)).reduce((sum, s) => sum + s.targetDurationSec, 0) * 10) / 10,
       ctaSec: ctx.ctaSec,
     };
   }
@@ -152,7 +170,7 @@ export class StoryboardService implements OnModuleInit {
   // ---------- jobs ----------
 
   async startGenerate(projectId: string, instruction?: string, force?: boolean): Promise<JobDto> {
-    if (!(await this.product.get(projectId))) throw new BadRequestException('Run the product analysis first.');
+    await this.assertAnalysed(projectId);
     const withUploads = await this.prisma.asset.count({ where: { scene: { projectId } } });
     if (withUploads > 0 && !force) {
       throw new ConflictException(
@@ -175,10 +193,11 @@ export class StoryboardService implements OnModuleInit {
     const after = data.afterSceneId ? scenes.findIndex((s) => s.id === data.afterSceneId) : scenes.length - 1;
     const order = after + 1;
     const { afterSceneId: _after, ...fields } = data;
-    const built = this.buildFromFields(ctx, fields);
+    const product = this.assertProduct(ctx, fields.productId);
+    const built = this.buildFromFields(ctx, { ...fields, productId: product });
     const created = await this.prisma.$transaction(async (tx) => {
       for (const s of scenes.slice(order)) await tx.scene.update({ where: { id: s.id }, data: { order: s.order + 1 } });
-      return tx.scene.create({ data: { projectId, order, ...this.columns(fields, built) } });
+      return tx.scene.create({ data: { projectId, order, ...this.columns({ ...fields, productId: product }, built) } });
     });
     return this.toDto(created, ctx);
   }
@@ -188,8 +207,9 @@ export class StoryboardService implements OnModuleInit {
     const ctx = await this.context(scene.projectId);
     const { imagePrompt, promptOverride, ...fields } = data;
     const merged = { ...this.editable(scene), ...fields };
+    merged.productId = this.assertProduct(ctx, merged.productId);
     const override = imagePrompt !== undefined ? true : (promptOverride ?? scene.promptOverride);
-    const built = this.buildFromFields(ctx, merged);
+    const built = this.buildFromFields(ctx, merged, this.poseFor(ctx, scene));
     const updated = await this.prisma.scene.update({
       where: { id: sceneId },
       data: {
@@ -224,24 +244,22 @@ export class StoryboardService implements OnModuleInit {
 
   private async generate(projectId: string, instruction?: string): Promise<number> {
     const ctx = await this.context(projectId);
-    const project = await this.projects.find(projectId);
     const constraints = this.constraints(ctx);
 
     const result = await this.llm.call({
       task: 'storyboard',
       schema: storyboardChecked(constraints),
-      system: [await this.storyboardSystem(), this.personaBlock(ctx)],
+      system: [await this.storyboardSystem(ctx), this.personaBlock(ctx)],
       content: [
         {
           type: 'text',
           text: [
-            this.productBlock(ctx, project),
+            this.reelBlock(ctx),
+            '',
+            this.productsBlock(ctx),
             '',
             '## Constraints',
-            `- Back of the product known: ${constraints.backKnown ? 'yes' : 'no (no back views, no full turns)'}`,
-            `- Pieces in the set: ${constraints.pieceCount}`,
-            `- Product image roles available: ${constraints.availableRoles.join(', ')}`,
-            `- Scene durations must add up to ${constraints.minTotalSec}–${constraints.maxTotalSec} s (a ${ctx.ctaSec} s CTA is added after).`,
+            `- Scene durations (every scene that becomes video) must add up to ${constraints.minTotalSec}–${constraints.maxTotalSec} s (a ${ctx.ctaSec} s CTA is added after).`,
             '',
             this.placesBlock(ctx),
             '',
@@ -270,29 +288,28 @@ export class StoryboardService implements OnModuleInit {
   private async revise(sceneId: string, instruction?: string): Promise<void> {
     const scene = await this.findScene(sceneId);
     const ctx = await this.context(scene.projectId);
-    const project = await this.projects.find(scene.projectId);
     const others = await this.prisma.scene.findMany({ where: { projectId: scene.projectId }, orderBy: { order: 'asc' } });
     const constraints = this.constraints(ctx);
-    const storyboardRules = await this.storyboardSystem();
+    const productNumber = (id: string | null) => ctx.products.find((p) => p.id === id)?.number ?? null;
 
     const result = await this.llm.call({
       task: 'scene_prompt',
       schema: sceneReviseChecked(constraints),
-      system: [this.prompts.render('scene-revise', { storyboardRules }), this.personaBlock(ctx)],
+      system: [this.prompts.render('scene-revise', { storyboardRules: await this.storyboardSystem(ctx) }), this.personaBlock(ctx)],
       content: [
         {
           type: 'text',
           text: [
-            this.productBlock(ctx, project),
+            this.reelBlock(ctx),
             '',
-            '## Constraints',
-            `- Back of the product known: ${constraints.backKnown ? 'yes' : 'no'}`,
-            `- Product image roles available: ${constraints.availableRoles.join(', ')}`,
+            this.productsBlock(ctx),
             '',
             this.placesBlock(ctx),
             '',
             '## The full storyboard (for consistency)',
-            ...others.map((s) => `${s.order + 1}. ${s.type} · ${s.setting} · ${s.outfitState}: ${s.description}`),
+            ...others.map(
+              (s) => `${s.order + 1}. ${s.type}${productNumber(s.productId) ? ` · product ${productNumber(s.productId)}` : ''} · ${s.setting} · ${s.outfitState}: ${s.description}`,
+            ),
             '',
             `## Scene ${scene.order + 1} to revise (JSON)`,
             JSON.stringify(this.toLlm(ctx, this.editable(scene)), null, 2),
@@ -305,7 +322,7 @@ export class StoryboardService implements OnModuleInit {
     });
 
     const fields = this.fromLlm(ctx, result.data.scene);
-    const built = this.buildFromFields(ctx, fields);
+    const built = this.buildFromFields(ctx, fields, this.poseFor(ctx, scene));
     await this.prisma.scene.update({
       where: { id: sceneId },
       data: { ...this.columns(fields, built), promptOverride: false },
@@ -314,29 +331,61 @@ export class StoryboardService implements OnModuleInit {
 
   // ---------- building ----------
 
+  private async assertAnalysed(projectId: string): Promise<void> {
+    const project = await this.projects.find(projectId);
+    const specs = await this.product.specs(projectId);
+    const missing = sortProducts(project.products).filter((p) => !specs.has(p.id));
+    if (missing.length) {
+      throw new BadRequestException(`Run the product analysis first (${missing.map((p) => p.title).join(', ')}).`);
+    }
+  }
+
   private async context(projectId: string): Promise<BoardContext> {
     const project = await this.projects.find(projectId);
-    const spec = await this.product.get(projectId);
-    if (!spec) throw new BadRequestException('Run the product analysis first.');
-    const [rules, tools, cta] = await Promise.all([
+    const specs = await this.product.specs(projectId);
+    const products = sortProducts(project.products);
+    const unanalysed = products.filter((p) => !specs.has(p.id));
+    if (unanalysed.length) {
+      throw new BadRequestException(`Run the product analysis first (${unanalysed.map((p) => p.title).join(', ')}).`);
+    }
+    const [rules, tools, cta, scenes] = await Promise.all([
       this.settings.get('storyboard.refRules'),
       this.settings.get('tools.image'),
       this.settings.get('compose.cta'),
+      this.prisma.scene.findMany({ where: { projectId }, include: { approvedAsset: true }, orderBy: { order: 'asc' } }),
     ]);
     const inf = project.influencer;
     const references = inf.references.map((r) => ({ id: r.id, tags: refTags(r), path: r.path, sortOrder: r.sortOrder, note: r.note }));
     return {
       projectId,
+      format: readJson(z.enum(STORY_FORMATS), project.format, 'classic'),
+      title: project.title,
+      occasion: project.occasion,
       persona: { ...inf, ...personaOf(inf) },
       references,
       backgrounds: references.filter((r) => r.tags.includes('background')).sort((a, b) => a.sortOrder - b.sortOrder),
-      products: project.productImages.map((p) => ({
+      products: products.map((p, i) => ({
         id: p.id,
-        role: readJson(z.enum(PRODUCT_IMAGE_ROLES), p.role, 'other'),
-        order: p.order,
-        path: p.path,
+        number: i + 1,
+        title: p.title,
+        note: p.note,
+        store: p.source.displayName,
+        priceLabel: productPriceLabel(p),
+        images: p.images.map((im) => ({
+          id: im.id,
+          role: readJson(z.enum(PRODUCT_IMAGE_ROLES), im.role, 'other'),
+          order: im.order,
+          path: im.path,
+        })),
+        spec: specs.get(p.id)!,
       })),
-      spec,
+      scenes: scenes.map((s) => ({
+        id: s.id,
+        order: s.order,
+        type: s.type,
+        productId: s.productId,
+        approved: s.approvedAsset ? { id: s.approvedAsset.id, path: s.approvedAsset.path } : null,
+      })),
       rules,
       maxRefs: Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.maxRefs])),
       ctaSec: cta.durationSec,
@@ -344,14 +393,25 @@ export class StoryboardService implements OnModuleInit {
   }
 
   private constraints(ctx: BoardContext): StoryboardConstraints {
+    const rule = FORMATS[ctx.format];
     return {
-      backKnown: ctx.products.some((p) => p.role === 'back'),
-      pieceCount: ctx.spec.spec.pieces.length,
-      availableRoles: [...new Set(ctx.products.map((p) => p.role))],
-      minTotalSec: REEL_MIN_SEC - ctx.ctaSec,
-      maxTotalSec: REEL_MAX_SEC - ctx.ctaSec,
+      format: ctx.format,
+      products: ctx.products.map((p) => ({
+        backKnown: p.images.some((im) => im.role === 'back'),
+        pieceCount: p.spec.spec.pieces.length,
+        availableRoles: [...new Set(p.images.map((im) => im.role))],
+      })),
+      minTotalSec: rule.reelSec.min - ctx.ctaSec,
+      maxTotalSec: rule.reelSec.max - ctx.ctaSec,
       placeCount: ctx.backgrounds.length,
     };
+  }
+
+  /** A scene's product id, checked against the project's products (null is fine for scenes that show none). */
+  private assertProduct(ctx: BoardContext, productId: string | null | undefined): string | null {
+    if (!productId) return ctx.products.length === 1 ? ctx.products[0].id : null;
+    if (!ctx.products.some((p) => p.id === productId)) throw new BadRequestException('That product is not part of this project.');
+    return productId;
   }
 
   private placesBlock(ctx: BoardContext): string {
@@ -362,48 +422,67 @@ export class StoryboardService implements OnModuleInit {
     ].join('\n');
   }
 
-  /** The storyboard's numbered `place` becomes the background reference id. */
+  /** The storyboard's numbered `place` and `product` become ids. */
   private fromLlm(ctx: BoardContext, scene: StoryboardScene): SceneEditable {
-    const { place, ...rest } = scene;
-    return { ...rest, backgroundId: place ? (ctx.backgrounds[place - 1]?.id ?? null) : null };
+    const { place, product, ...rest } = scene;
+    const productId = product ? (ctx.products[product - 1]?.id ?? null) : ctx.products.length === 1 && (scene.showsProduct || scene.outfitState === 'wearing_product') ? ctx.products[0].id : null;
+    return { ...rest, backgroundId: place ? (ctx.backgrounds[place - 1]?.id ?? null) : null, productId };
   }
 
   private toLlm(ctx: BoardContext, scene: SceneEditable): StoryboardScene {
-    const { backgroundId, ...rest } = scene;
-    const index = ctx.backgrounds.findIndex((b) => b.id === backgroundId);
-    return { ...rest, place: index >= 0 ? index + 1 : null };
+    const { backgroundId, productId, ...rest } = scene;
+    const place = ctx.backgrounds.findIndex((b) => b.id === backgroundId);
+    const product = ctx.products.find((p) => p.id === productId);
+    return { ...rest, place: place >= 0 ? place + 1 : null, product: product?.number ?? null };
   }
 
-  private garmentText(ctx: BoardContext): string {
-    const s = ctx.spec.spec;
-    return [s.category, s.garmentType, s.neckline.front, s.neckline.back, s.backDetails, ctx.spec.garmentParagraph].join(' ');
+  private garmentText(product: BoardProduct | undefined): string {
+    if (!product) return '';
+    const s = product.spec.spec;
+    return [s.category, s.garmentType, s.neckline.front, s.neckline.back, s.backDetails, product.spec.garmentParagraph].join(' ');
+  }
+
+  /** A transition's "after" still: the approved "before" still of the same product, just before it. */
+  private poseFor(ctx: BoardContext, scene: Pick<Scene, 'order' | 'type' | 'productId'>): { id: string; path: string } | null {
+    if (scene.type !== 'transition_after') return null;
+    const before = ctx.scenes.find((s) => s.order === scene.order - 1);
+    return before?.type === 'transition_before' && before.productId === scene.productId ? before.approved : null;
   }
 
   /** Attachments + prompt for a scene's fields. Pure given the context. */
-  private buildFromFields(ctx: BoardContext, fields: SceneEditable): BuiltScene {
+  private buildFromFields(ctx: BoardContext, fields: SceneEditable, pose: { id: string; path: string } | null = null): BuiltScene {
+    const product = ctx.products.find((p) => p.id === fields.productId);
     const background = fields.backgroundId ? (ctx.backgrounds.find((b) => b.id === fields.backgroundId) ?? null) : null;
     const selection = selectAttachments({
       influencerName: ctx.persona.name,
       shotKind: fields.shotKind,
-      showsProduct: fields.showsProduct,
+      showsProduct: fields.showsProduct && Boolean(product),
       productRoles: fields.productRoles,
-      garmentText: this.garmentText(ctx),
+      garmentText: this.garmentText(product),
       references: ctx.references,
-      products: ctx.products,
+      products: product?.images ?? [],
       rules: ctx.rules,
       maxRefs: ctx.maxRefs[fields.imageModel] ?? 4,
       background,
+      pose,
     });
     if (fields.backgroundId && !background) selection.missing.push('The background picked for this scene was removed; pick another or none.');
+    const template = templateFor(fields);
+    if (template !== 'templates/image-plain' && !product) selection.missing.unshift('Pick the product this scene shows.');
+    if (fields.type === 'transition_after' && !pose) {
+      selection.notes.push('Approve the "before" still first: it is attached as the pose reference so only the outfit changes.');
+    }
     let prompt: string;
     try {
       prompt = buildImagePrompt(
         {
           persona: ctx.persona,
           scene: fields,
-          garmentParagraph: ctx.spec.garmentParagraph,
+          garmentParagraph: product?.spec.garmentParagraph ?? '',
           personCount: selection.personCount,
           backgroundIndex: selection.backgroundIndex,
+          poseIndex: selection.poseIndex,
+          productCount: selection.productCount,
         },
         this.prompts,
       );
@@ -433,7 +512,7 @@ export class StoryboardService implements OnModuleInit {
 
   /** Rebuilt on every read so new reference uploads show up immediately. */
   private build(ctx: BoardContext, scene: Scene): BuiltScene {
-    const built = this.buildFromFields(ctx, this.editable(scene));
+    const built = this.buildFromFields(ctx, this.editable(scene), this.poseFor(ctx, scene));
     if (!scene.promptOverride) return built;
     return {
       ...built,
@@ -462,6 +541,7 @@ export class StoryboardService implements OnModuleInit {
       imageModelReason: scene.imageModelReason,
       motion: scene.motion,
       backgroundId: scene.backgroundId,
+      productId: scene.productId,
     };
   }
 
@@ -481,6 +561,7 @@ export class StoryboardService implements OnModuleInit {
       imageModelReason: fields.imageModelReason,
       motion: fields.motion,
       backgroundId: fields.backgroundId,
+      productId: fields.productId,
       imagePrompt: built.prompt,
       attachments: toJson(built.attachments.map(({ kind, id, label, fileName }) => ({ kind, id, label, fileName }))),
     };
@@ -508,9 +589,10 @@ export class StoryboardService implements OnModuleInit {
 
   // ---------- prompt text ----------
 
-  private async storyboardSystem(): Promise<string> {
+  private async storyboardSystem(ctx: BoardContext): Promise<string> {
     const tools = await this.settings.get('tools.image');
     return this.prompts.render('storyboard', {
+      formatRules: this.prompts.render(`formats/${ctx.format}`),
       copyRules: this.prompts.render('rules/copy-rules'),
       toolNotes: Object.entries(tools)
         .map(([key, t]) => `- \`${key}\` (${t.label}, up to ${t.maxRefs} reference images): ${t.notes}`)
@@ -532,24 +614,43 @@ export class StoryboardService implements OnModuleInit {
     ].join('\n');
   }
 
-  private productBlock(ctx: BoardContext, project: { productTitle: string; occasion: string; source: { displayName: string } }): string {
+  private reelBlock(ctx: BoardContext): string {
+    const rule = FORMATS[ctx.format];
     return [
-      '## Product',
-      `Title: ${project.productTitle}`,
-      `Store: ${project.source.displayName}`,
-      `Occasion / mood: ${project.occasion}`,
-      '',
-      'Garment paragraph (inserted into prompts automatically):',
-      ctx.spec.garmentParagraph,
-      '',
-      'Spec (JSON):',
-      JSON.stringify(ctx.spec.spec),
-      '',
-      'Must match:',
-      ...ctx.spec.mustMatch.map((m) => `- ${m.label}: ${m.expected}`),
-      '',
-      'Unknown, never show:',
-      ...(ctx.spec.unknowns.length ? ctx.spec.unknowns.map((u) => `- ${u}`) : ['- nothing']),
+      '## The Reel',
+      `Format: ${rule.label} (${ctx.format})`,
+      `Title: ${ctx.title}${rule.titleOnScreen ? ' (the hook shows it as its on-screen text, word for word)' : ''}`,
+      `Occasion / mood: ${ctx.occasion}`,
     ].join('\n');
+  }
+
+  private productsBlock(ctx: BoardContext): string {
+    return ctx.products
+      .map((p) => {
+        const roles = [...new Set(p.images.map((im) => im.role))];
+        return [
+          `## Product ${p.number}: ${p.title}`,
+          `Store: ${p.store}${p.priceLabel ? ` · badge: ${p.priceLabel}` : ''}`,
+          p.note ? `Note for on-screen text: ${p.note}` : '',
+          `Back of the product known: ${p.images.some((im) => im.role === 'back') ? 'yes' : 'no (no back views, no full turns)'}`,
+          `Pieces in the set: ${p.spec.spec.pieces.length}`,
+          `Image roles available: ${roles.join(', ')}`,
+          '',
+          'Garment paragraph (inserted into prompts automatically):',
+          p.spec.garmentParagraph,
+          '',
+          'Spec (JSON):',
+          JSON.stringify(p.spec.spec),
+          '',
+          'Must match:',
+          ...p.spec.mustMatch.map((m) => `- ${m.label}: ${m.expected}`),
+          '',
+          'Unknown, never show:',
+          ...(p.spec.unknowns.length ? p.spec.unknowns.map((u) => `- ${u}`) : ['- nothing']),
+        ]
+          .filter((l, i, all) => l !== '' || all[i - 1] !== '')
+          .join('\n');
+      })
+      .join('\n\n');
   }
 }

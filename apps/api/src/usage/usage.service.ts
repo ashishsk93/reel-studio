@@ -48,9 +48,9 @@ export class UsageService {
     const projectIds = [...new Set([...calls.flatMap((c) => (c.projectId ? [c.projectId] : [])), ...videos.flatMap((v) => (v.projectId ? [v.projectId] : []))])];
     const projects = await this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, productTitle: true },
+      select: { id: true, title: true },
     });
-    const titles = new Map(projects.map((p) => [p.id, p.productTitle]));
+    const titles = new Map(projects.map((p) => [p.id, p.title]));
 
     const total = emptyRow('total', 'Total');
     const byMonth = new Map<string, UsageRow>();

@@ -143,7 +143,7 @@ export const SETTINGS = {
   'compose.badgeSceneTypes': {
     label: 'Scene types that show the logo and price badge',
     schema: z.array(z.enum(SCENE_TYPES)),
-    default: ['hold_up', 'pieces', 'wearing_front', 'wearing_alt'] as const,
+    default: ['hold_up', 'pieces', 'wearing_front', 'wearing_alt', 'try_on', 'styled', 'transition_after'] as const,
   },
 } as const;
 

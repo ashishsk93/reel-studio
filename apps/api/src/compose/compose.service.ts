@@ -27,6 +27,7 @@ import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductService } from '../product/product.service';
 import { effectivePriceMode } from '../projects/project.mapper';
+import type { Product, Source } from '../generated/prisma/client';
 import { ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
@@ -165,8 +166,8 @@ export class ComposeService implements OnModuleInit {
     const segments = await this.segments(projectId);
     const zone = await this.zone();
     const types = await this.eligibleTypes();
-    const badge = await this.badgeImage(projectId);
     const cta = await this.cta(projectId);
+    const products = new Map(project.products.map((p) => [p.id, p]));
     const comp = await this.composition(projectId);
     const music = readJson(MusicSchema.nullable(), comp.music, null);
     const warnings: string[] = [];
@@ -175,6 +176,9 @@ export class ComposeService implements OnModuleInit {
     for (const s of segments) {
       const text = await this.textOverlay(s, zone);
       warnings.push(...text.warnings.map((w) => `Scene ${s.scene.order + 1}: ${w}`));
+      const product = s.scene.productId ? products.get(s.scene.productId) : undefined;
+      const badge = product ? await this.badgeImage(product) : null;
+      const mode = product ? effectivePriceMode(product) : 'hidden';
       dtos.push({
         id: s.id,
         sceneId: s.sceneId,
@@ -195,18 +199,24 @@ export class ComposeService implements OnModuleInit {
         placementWarning: s.placementWarning,
         detections: this.detections(s),
         sampleTimes: sampleTimes(s.inSec, s.outSec),
+        product: product
+          ? {
+              id: product.id,
+              title: product.title,
+              priceLabel: formatPriceLabel(product.priceInr, mode),
+              priceMode: mode,
+              store: product.source.displayName,
+              logoUrl: this.storage.url(product.source.logoPath),
+            }
+          : null,
+        badge: badge ? { url: this.storage.url(badge.rel)!, w: badge.w, h: badge.h } : null,
       });
     }
-    const scenes = await this.prisma.scene.count({ where: { projectId } });
+    const scenes = (await this.prisma.scene.findMany({ where: { projectId }, select: { type: true } })).filter((s) => s.type !== 'transition_before').length;
     if (segments.length < scenes) warnings.unshift(`${scenes - segments.length} scene(s) have no approved video window yet.`);
-    const mode = effectivePriceMode(project);
 
     return {
       segments: dtos,
-      badge: badge ? { url: this.storage.url(badge.rel)!, w: badge.w, h: badge.h } : null,
-      priceLabel: formatPriceLabel(project.priceInr, mode),
-      priceMode: mode,
-      source: { displayName: project.source.displayName, logoUrl: this.storage.url(project.source.logoPath) },
       safeZone: zone,
       cta,
       ctaPreviewUrl: this.storage.apiUrl(`/projects/${projectId}/cta/preview.jpg?v=${sha({ cta, segs: segments.map((s) => [s.assetId, s.outSec]) })}`),
@@ -250,15 +260,14 @@ export class ComposeService implements OnModuleInit {
     return { rel, ...meta };
   }
 
-  /** The store logo + price pill at scale 1, shared by all segments of a project. */
-  async badgeImage(projectId: string): Promise<{ rel: string; w: number; h: number } | null> {
-    const project = await this.projects.find(projectId);
-    const label = formatPriceLabel(project.priceInr, effectivePriceMode(project));
-    const logo = project.source.logoPath;
+  /** A product's store logo + price pill at scale 1 (cached by content). */
+  async badgeImage(product: Product & { source: Source }): Promise<{ rel: string; w: number; h: number } | null> {
+    const label = formatPriceLabel(product.priceInr, effectivePriceMode(product));
+    const logo = product.source.logoPath;
     if (!label && !logo) return null;
     const key = sha({ label, logo, v: 1 });
-    const rel = `projects/${projectId}/overlays/badge-${key}.png`;
-    const metaRel = `projects/${projectId}/overlays/badge-${key}.json`;
+    const rel = `projects/${product.projectId}/overlays/badge-${key}.png`;
+    const metaRel = `projects/${product.projectId}/overlays/badge-${key}.json`;
     if (await this.storage.exists(metaRel)) {
       const meta = JSON.parse(await fs.readFile(this.storage.abs(metaRel), 'utf8')) as { w: number; h: number };
       return { rel, ...meta };
@@ -269,15 +278,22 @@ export class ComposeService implements OnModuleInit {
     return { rel, w: img.w, h: img.h };
   }
 
+  /** The badge of the product a segment shows, or null (hooks and scenes without a product). */
+  async badgeFor(segment: { scene: { productId: string | null } }): Promise<{ rel: string; w: number; h: number } | null> {
+    if (!segment.scene.productId) return null;
+    const product = await this.prisma.product.findUnique({ where: { id: segment.scene.productId }, include: { source: true } });
+    return product ? this.badgeImage(product) : null;
+  }
+
   // ---------- placement ----------
 
   /** Re-places every automatic badge in order (preferring the previous corner); scores manual ones. */
   async recomputePlacements(projectId: string): Promise<void> {
     const segments = await this.segments(projectId);
-    const badge = await this.badgeImage(projectId);
     const zone = await this.zone();
     let previous: BadgeAnchor | null = null;
     for (const s of segments) {
+      const badge = await this.badgeFor(s);
       if (!s.badgeEnabled || !badge) {
         if (s.badgePlacement || s.placementWarning) {
           await this.prisma.segment.update({ where: { id: s.id }, data: { badgePlacement: Prisma.DbNull, placementWarning: null } });
@@ -349,7 +365,7 @@ export class ComposeService implements OnModuleInit {
 
   private async detectDetails(segmentId: string): Promise<void> {
     const s = await this.findSegment(segmentId);
-    const spec = await this.product.get(s.projectId);
+    const spec = s.scene.productId ? await this.product.forProduct(s.scene.productId) : null;
     const frame = await this.videos.frame(s.assetId, (s.inSec + s.outSec) / 2);
     const result = await this.llm.call({
       task: 'detail_regions',
@@ -409,7 +425,7 @@ export class ComposeService implements OnModuleInit {
     const text = await this.textOverlay(s, zone);
     ctx.drawImage(await loadImage(await fs.readFile(this.storage.abs(text.rel))), 0, 0);
     const placement = readJson(PlacementSchema.nullable(), s.badgePlacement, null);
-    const badge = await this.badgeImage(s.projectId);
+    const badge = await this.badgeFor(s);
     if (s.badgeEnabled && placement && badge) {
       ctx.drawImage(await loadImage(await fs.readFile(this.storage.abs(badge.rel))), placement.x, placement.y, badge.w * placement.scale, badge.h * placement.scale);
     }

@@ -29,6 +29,6 @@ export class RenderController {
     const render = await this.renders.find(id);
     const project = await this.prisma.project.findUniqueOrThrow({ where: { id: render.projectId } });
     const files = await this.renders.files(render);
-    await sendZip(res, `${safeName(project.productTitle)}-reel.zip`, files.map((f) => ({ name: f.name, file: this.storage.abs(f.rel) })));
+    await sendZip(res, `${safeName(project.title)}-reel.zip`, files.map((f) => ({ name: f.name, file: this.storage.abs(f.rel) })));
   }
 }

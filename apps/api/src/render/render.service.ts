@@ -3,7 +3,7 @@ import path from 'node:path';
 import { BadRequestException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { z } from 'zod';
-import { JOB_STATUSES, type JobDto, type QaCheckDto, type RenderDto } from '@reel/shared';
+import { FORMATS, JOB_STATUSES, STORY_FORMATS, type JobDto, type QaCheckDto, type RenderDto } from '@reel/shared';
 import type { Render } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { ComposeService, MusicSchema } from '../compose/compose.service';
@@ -79,9 +79,9 @@ export class RenderService implements OnModuleInit {
   private async plan(projectId: string, dir: string, warnings: string[]): Promise<RenderPlan> {
     const segments = await this.compose.segments(projectId);
     const zone = await this.compose.zone();
-    const badge = await this.compose.badgeImage(projectId);
     const segPlans: RenderPlan['segments'] = [];
     for (const s of segments) {
+      const badge = await this.compose.badgeFor(s);
       if (!s.asset.normalizedPath) throw new Error(`Scene ${s.scene.order + 1}: its video is still processing.`);
       const text = await this.compose.textOverlay(s, zone);
       warnings.push(...text.warnings.map((w) => `Scene ${s.scene.order + 1}: ${w}`));
@@ -157,7 +157,8 @@ export class RenderService implements OnModuleInit {
     await progress(0.87, 'Quality checks');
     const probeOut = await this.media.run('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', plan.output], projectId);
     const probe = parseFinalProbe(probeOut.stdout);
-    const checks: QaCheckDto[] = qaChecks(probe, total);
+    const format = readJson(z.enum(STORY_FORMATS), (await this.prisma.project.findUniqueOrThrow({ where: { id: projectId } })).format, 'classic');
+    const checks: QaCheckDto[] = qaChecks(probe, total, FORMATS[format].reelSec);
     const joins = joinTimes(plan);
     const black = await this.blackFrames(plan.output, joins, projectId);
     checks.push({

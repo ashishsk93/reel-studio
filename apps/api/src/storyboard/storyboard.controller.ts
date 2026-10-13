@@ -85,6 +85,6 @@ export class StoryboardController {
         ...attachments.map((a) => ({ name: `${folder}/${a.fileName}`, file: this.storage.abs(a.path) })),
       ];
     });
-    await sendZip(res, `${safeName(project.productTitle)}-storyboard.zip`, entries);
+    await sendZip(res, `${safeName(project.title)}-storyboard.zip`, entries);
   }
 }

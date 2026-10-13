@@ -7,6 +7,7 @@ You revise a single scene of an Instagram Reel storyboard. The rules of the stor
 - Change only what the instruction asks for. Keep every field the instruction doesn't mention identical, word for word.
 - If there is no instruction, improve the `description` so the image generator gets a clearer, more concrete, more natural candid photo, keeping the same idea.
 - Never show anything listed as unknown about the product.
+- `product` is the number of the product the scene shows (from the numbered list) or null; keep it unless the instruction changes it.
 - `place` is the number of one of her places (listed in the request) or null; keep it unless the instruction changes where the scene happens.
 
 {{storyboardRules}}

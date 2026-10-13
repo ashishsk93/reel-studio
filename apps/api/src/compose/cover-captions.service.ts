@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, NotFoundException, type OnModuleInit }
 import { createCanvas } from '@napi-rs/canvas';
 import { z } from 'zod';
 import {
+  FORMATS,
+  STORY_FORMATS,
   captionsChecked,
   coverPickChecked,
   sceneTextChecked,
@@ -14,6 +16,7 @@ import type { CaptionPackage } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { personaBlock, productBlock } from '../assets/asset-context.service';
 import { personaOf } from '../influencers/influencer.mapper';
+import { productPriceLabel, sortProducts } from '../projects/project.mapper';
 import { JobsService } from '../jobs/jobs.service';
 import { LlmService, type LlmPart } from '../llm/llm.service';
 import { PromptService } from '../llm/prompt.service';
@@ -54,12 +57,42 @@ export const DEFAULT_CHECKLIST = [
   'Reply to comments and send the LINK DMs in the first hour',
 ];
 
-/** Assembles the caption from its parts, with the CTA and the store's disclosure lines. */
-export function assembleCaption(parts: { hook: string; outfitLines: string[]; hashtags: string[] }, disclosures: string[]): string {
-  return [parts.hook.trim(), ...parts.outfitLines.map((l) => l.trim()), '', CTA_LINE, '', ...disclosures, '', parts.hashtags.join(' ')]
+/**
+ * Assembles the caption from its parts, with the CTA and the stores' disclosure lines. Multi-product
+ * Reels get a numbered product list (title and badge price) after the outfit lines.
+ */
+export function assembleCaption(
+  parts: { hook: string; outfitLines: string[]; hashtags: string[] },
+  disclosures: string[],
+  productLines: string[] = [],
+): string {
+  return [
+    parts.hook.trim(),
+    ...parts.outfitLines.map((l) => l.trim()),
+    ...(productLines.length ? ['', ...productLines] : []),
+    '',
+    CTA_LINE,
+    '',
+    ...[...new Set(disclosures)],
+    '',
+    parts.hashtags.join(' '),
+  ]
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/** "1. Teal kurti – Under ₹500" for each product of a multi-product Reel. */
+export function productLines(products: Array<{ title: string; priceLabel: string | null }>): string[] {
+  if (products.length < 2) return [];
+  return products.map((p, i) => `${i + 1}. ${p.title}${p.priceLabel ? ` – ${p.priceLabel}` : ''}`);
+}
+
+/** The LINK DM: one link, or a numbered list of every product's link. */
+export function assembleDmFor(message: string, products: Array<{ title: string; link: string | null }>, disclosure: string | undefined): string {
+  if (products.length <= 1) return assembleDm(message, products[0]?.link ?? null, disclosure);
+  const lines = products.map((p, i) => `${i + 1}. ${p.title}: ${p.link ?? 'add the affiliate link on the Product step'}`);
+  return [message.trim(), '', ...lines, disclosure ? `(${disclosure})` : ''].filter((l, i) => l || i === 1).join('\n').trim();
 }
 
 export function assembleDm(message: string, link: string | null, disclosure: string | undefined): string {
@@ -127,7 +160,8 @@ export class CoverCaptionsService implements OnModuleInit {
   private async sceneText(segmentId: string, instruction?: string): Promise<{ segmentId: string; options: string[] }> {
     const s = await this.compose.findSegment(segmentId);
     const project = await this.projects.find(s.projectId);
-    const spec = await this.product.get(s.projectId);
+    const spec = s.scene.productId ? await this.product.forProduct(s.scene.productId) : null;
+    const product = project.products.find((p) => p.id === s.scene.productId);
     const inf = project.influencer;
     const persona = personaOf(inf);
     const others = (await this.compose.segments(s.projectId)).filter((o) => o.id !== s.id);
@@ -145,7 +179,8 @@ export class CoverCaptionsService implements OnModuleInit {
         {
           type: 'text',
           text: [
-            `Product title: ${project.productTitle}`,
+            `Reel title: ${project.title}`,
+            product ? `Product in this scene: ${product.title}${product.note ? ` (${product.note})` : ''}` : 'This scene shows no product.',
             `Occasion: ${project.occasion}`,
             '',
             `## Scene ${s.scene.order + 1} (${s.scene.type})`,
@@ -226,7 +261,7 @@ export class CoverCaptionsService implements OnModuleInit {
       schema: coverPickChecked(picked.length),
       system: [this.prompts.render('cover-pick', { copyRules: this.prompts.render('rules/copy-rules') }), personaBlock(project.influencer)],
       content: [
-        { type: 'text', text: `Product: ${project.productTitle}. Occasion: ${project.occasion}. ${picked.length} candidate frames:` },
+        { type: 'text', text: `Reel: ${project.title}. Occasion: ${project.occasion}. ${picked.length} candidate frames:` },
         ...parts,
         { type: 'text', text: 'Pick the best cover frame and write 3 titles.' },
       ],
@@ -300,11 +335,12 @@ export class CoverCaptionsService implements OnModuleInit {
 
   private async generateCaptions(projectId: string): Promise<void> {
     const project = await this.projects.find(projectId);
-    const spec = await this.product.get(projectId);
-    if (!spec) throw new Error('Run the product analysis first.');
+    const specs = await this.product.specs(projectId);
+    const products = sortProducts(project.products);
+    if (products.some((p) => !specs.has(p.id))) throw new Error('Run the product analysis first.');
     const inf = project.influencer;
     const persona = personaOf(inf);
-    const disclosures = readJson(z.array(z.string()), project.source.disclosureLines, []);
+    const disclosures = [...new Set(products.flatMap((p) => readJson(z.array(z.string()), p.source.disclosureLines, [])))];
     const requiredTags = [BRAND_TAG, inf.hashtag].filter(Boolean);
     const segments = await this.compose.segments(projectId);
 
@@ -314,14 +350,15 @@ export class CoverCaptionsService implements OnModuleInit {
       system: [
         this.prompts.render('captions', { copyRules: this.prompts.render('rules/copy-rules') }),
         [personaBlock(inf), `Voice: ${inf.voiceNotes}`, `Personality: ${inf.personality}`, `Example lines: ${persona.exampleLines.map((l) => `"${l}"`).join(' / ')}`].join('\n'),
-        productBlock(spec),
+        ...products.map((p, i) => (products.length > 1 ? `## Product ${i + 1}: ${p.title}\n${productBlock(specs.get(p.id)!)}` : productBlock(specs.get(p.id)!))),
       ],
       content: [
         {
           type: 'text',
           text: [
-            `Product title: ${project.productTitle}`,
-            `Store: ${project.source.displayName}`,
+            `Reel: ${project.title} (${FORMATS[readJson(z.enum(STORY_FORMATS), project.format, 'classic')].label})`,
+            ...products.map((p, i) => `Product ${i + 1}: ${p.title} · ${p.source.displayName}${productPriceLabel(p) ? ` · ${productPriceLabel(p)}` : ''}`),
+            products.length > 1 ? 'The app adds a numbered list of the products with their prices after your outfit lines; keep the outfit lines about the Reel as a whole.' : '',
             `Occasion: ${project.occasion}`,
             `Required hashtags: ${requiredTags.join(' ')}`,
             `On-screen texts in the Reel: ${segments.map((s) => `"${s.onScreenText}"`).join(', ')}`,
@@ -336,10 +373,18 @@ export class CoverCaptionsService implements OnModuleInit {
     const out = result.data;
     const hashtags = [...new Set(out.hashtags.map((h) => h.trim()))];
     const data = {
-      caption: assembleCaption({ hook: out.hook, outfitLines: out.outfitLines, hashtags }, disclosures),
+      caption: assembleCaption(
+        { hook: out.hook, outfitLines: out.outfitLines, hashtags },
+        disclosures,
+        productLines(products.map((p) => ({ title: p.title, priceLabel: productPriceLabel(p) }))),
+      ),
       hashtags: toJson(hashtags),
       firstComment: out.firstComment?.trim() || null,
-      dmTemplate: assembleDm(out.dmMessage, project.affiliateLink ?? project.productUrl, disclosures[0]),
+      dmTemplate: assembleDmFor(
+        out.dmMessage,
+        products.map((p) => ({ title: p.title, link: p.affiliateLink ?? p.productUrl })),
+        disclosures[0],
+      ),
       coverTitles: toJson([]),
       sceneTexts: toJson(segments.map((s) => ({ sceneId: s.sceneId, text: s.onScreenText }))),
       checklist: toJson(DEFAULT_CHECKLIST.map((item) => ({ item, done: false }))),

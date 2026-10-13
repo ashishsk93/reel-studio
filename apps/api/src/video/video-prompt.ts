@@ -64,6 +64,20 @@ export function buildMultiShotPrompt(
   return prompt;
 }
 
+/** Outfit transition: Kling start frame (her own clothes) → end frame (wearing the product). */
+export function buildTransitionPrompt(input: { name: string; forbiddenFeatures: string[]; motion: string }, prompts: PromptService): string {
+  const first = input.name.split(' ')[0] || input.name;
+  const prompt = tidyPrompt(
+    prompts.render('templates/video-transition', {
+      motion: sentence(input.motion || 'She does a quick spin and lands facing the camera with a bright smile'),
+      name: first,
+      forbiddenReminder: forbiddenReminder(input.forbiddenFeatures),
+    }),
+  );
+  if (hasPlaceholder(prompt)) throw new VideoPromptError('The video prompt contains brackets or a placeholder.');
+  return prompt;
+}
+
 /** Single-scene image-to-video prompt (section 9 pattern). */
 export function buildSinglePrompt(input: { name: string; forbiddenFeatures: string[]; motion: string }, prompts: PromptService): string {
   const first = input.name.split(' ')[0] || input.name;

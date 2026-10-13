@@ -111,14 +111,16 @@ export class AssetContextService {
     const { scene, attachments, prompt } = await this.storyboard.sceneAttachments(sceneId);
     const project = await this.prisma.project.findUniqueOrThrow({
       where: { id: scene.projectId },
-      include: { influencer: { include: { references: true } }, productImages: true },
+      include: { influencer: { include: { references: true } }, products: { include: { images: true } } },
     });
-    const spec = await this.product.get(project.id);
-    if (!spec) throw new BadRequestException('Run the product analysis first.');
+    // The scene's product (hooks may show none); its images, analysis and must-match list.
+    const product = project.products.find((p) => p.id === scene.productId) ?? null;
+    const spec = product ? await this.product.forProduct(product.id) : null;
+    if (product && !spec) throw new BadRequestException(`Run the analysis of "${product.title}" first.`);
     const inf = project.influencer;
     const first = inf.name.split(' ')[0];
     const refs = refCandidates(inf);
-    const products: ProductCandidate[] = project.productImages.map((p) => ({
+    const products: ProductCandidate[] = (product?.images ?? []).map((p) => ({
       id: p.id,
       role: readJson(z.enum(PRODUCT_IMAGE_ROLES), p.role, 'other'),
       order: p.order,
@@ -133,9 +135,13 @@ export class AssetContextService {
     const anchor = refs.find((r) => r.tags.includes('anchor'));
     if (anchor) add(anchor.id, anchor.path, `Reference: ${first}'s anchor (her face)`);
     for (const a of attachments) {
-      add(a.id, a.path, a.kind === 'reference' ? `Reference: ${a.label}` : `Product image (${a.label.replace(/^Product /, '')})`);
+      add(
+        a.id,
+        a.path,
+        a.kind === 'reference' ? `Reference: ${a.label}` : a.kind === 'asset' ? `${a.label} (same pose and place expected)` : `Product image (${a.label.replace(/^Product /, '')})`,
+      );
     }
-    const productInFrame = scene.showsProduct || scene.outfitState === 'wearing_product';
+    const productInFrame = Boolean(product) && (scene.showsProduct || scene.outfitState === 'wearing_product');
     if (productInFrame) {
       const byRelevance = [...products].sort((a, b) => Number(b.role === 'detail') - Number(a.role === 'detail') || a.order - b.order);
       for (const p of byRelevance) if (p.role !== 'back' || scene.shotKind === 'back') add(p.id, p.path, `Product image (${p.role})`);
@@ -146,7 +152,7 @@ export class AssetContextService {
       `Type: ${scene.type}. Purpose: ${scene.purpose}`,
       `Framing: ${scene.shotKind}. Setting: ${scene.setting}`,
       scene.outfitState === 'wearing_product'
-        ? 'She should be wearing the product.'
+        ? `She should be wearing the product${product ? ` (${product.title})` : ''}.`
         : `She should be in her own clothes (${inf.homeOutfit})${scene.showsProduct ? ', holding or showing the product' : ''}.`,
       `Product in frame: ${productInFrame ? 'yes' : 'no'}`,
       `Scene: ${scene.description}`,
@@ -167,11 +173,11 @@ export class AssetContextService {
       maxRefs: await this.maxRefs(),
       reviewTask: 'image_review',
       reviewPrompt: 'image-review',
-      contextBlocks: [personaBlock(inf), productBlock(spec)],
+      contextBlocks: [personaBlock(inf), ...(spec ? [productBlock(spec)] : [])],
       ownerText,
       compareImages: compare.map((c): LlmPart => ({ type: 'image', path: c.path, label: c.label })),
-      mustMatch: spec.mustMatch,
-      mustMatchKeys: productInFrame ? spec.mustMatch.map((m) => m.key) : [],
+      mustMatch: spec?.mustMatch ?? [],
+      mustMatchKeys: productInFrame && spec ? spec.mustMatch.map((m) => m.key) : [],
       expectedAspect: '9:16',
       checkFaceZone: true,
     };

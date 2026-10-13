@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { advance, canOpenStep, isStepDone } from './steps.js';
-import { ProjectCreateFieldsSchema, ProjectUpdateSchema } from './schemas/project.js';
+import { ProjectCreateFieldsSchema, ProductUpdateSchema } from './schemas/project.js';
 import { ProductAnalysisChecked } from './llm/product.js';
 
 describe('status machine', () => {
@@ -21,26 +21,30 @@ describe('status machine', () => {
 });
 
 describe('project schemas', () => {
-  const base = {
-    influencerId: 'i',
-    sourceId: 's',
-    productTitle: 'Lavender kurta set',
-    priceInr: '1499',
-    occasion: 'Diwali party',
-  };
+  const product = { title: 'Lavender kurta set', sourceId: 's', priceInr: '1499', imageCount: 2 };
+  const base = { influencerId: 'i', title: 'Lavender kurta set', occasion: 'Diwali party' };
+  const create = (over: Record<string, unknown> = {}, products: unknown[] = [product]) =>
+    ProjectCreateFieldsSchema.safeParse({ ...base, products: JSON.stringify(products), ...over });
 
-  it('coerces multipart strings and parses roles', () => {
-    const parsed = ProjectCreateFieldsSchema.parse({ ...base, roles: '["front","back"]', productUrl: '' });
-    expect(parsed.priceInr).toBe(1499);
-    expect(parsed.roles).toEqual(['front', 'back']);
-    expect(parsed.productUrl).toBeNull();
+  it('parses multipart fields: the products JSON and the roles', () => {
+    const parsed = create({ roles: '["front","back"]' }, [{ ...product, productUrl: '' }]);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data!.format).toBe('classic');
+    expect(parsed.data!.products[0]).toMatchObject({ priceInr: 1499, productUrl: null, note: '' });
+    expect(parsed.data!.roles).toEqual(['front', 'back']);
   });
 
   it('validates links, price and roles', () => {
-    expect(ProjectCreateFieldsSchema.safeParse({ ...base, affiliateLink: 'amzn.to/x' }).success).toBe(false);
-    expect(ProjectCreateFieldsSchema.safeParse({ ...base, priceInr: '0' }).success).toBe(false);
-    expect(ProjectCreateFieldsSchema.safeParse({ ...base, roles: '["side"]' }).success).toBe(false);
-    expect(ProjectUpdateSchema.parse({ affiliateLink: '' }).affiliateLink).toBeNull();
+    expect(create({}, [{ ...product, affiliateLink: 'amzn.to/x' }]).success).toBe(false);
+    expect(create({}, [{ ...product, priceInr: '0' }]).success).toBe(false);
+    expect(create({ roles: '["side"]' }).success).toBe(false);
+    expect(ProductUpdateSchema.parse({ affiliateLink: '' }).affiliateLink).toBeNull();
+  });
+
+  it('checks the product count against the format', () => {
+    expect(create({ format: 'haul' }).error!.issues[0].message).toContain('Price-cap haul takes 2–5 products (got 1)');
+    expect(create({ format: 'haul' }, [product, product]).success).toBe(true);
+    expect(create({ format: 'three_ways' }, [product, product]).error!.issues[0].message).toContain('takes 1 product (got 2)');
   });
 });
 

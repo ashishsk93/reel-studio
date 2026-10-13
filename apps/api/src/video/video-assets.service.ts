@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, NotFoundException, type OnModuleInit }
 import { z } from 'zod';
 import {
   ASSET_STATUSES,
+  SCENE_TYPES,
+  hasSegment,
   ISSUE_SEVERITIES,
   VERDICTS,
   VIDEO_FIX_KINDS,
@@ -33,7 +35,7 @@ import { StorageService } from '../storage/storage.service';
 import { FPS, boundsIssues, mapCuts, planFrameTimes, snap, suggestWindow, toFrame } from './cuts';
 import { ProbeError } from './ffmpeg';
 import { MediaService } from './media.service';
-import { VideoPromptError, buildSinglePrompt } from './video-prompt';
+import { VideoPromptError } from './video-prompt';
 import { VideoService, type VideoContext } from './video.service';
 
 export const VIDEO_PROCESS_JOB = 'video.process';
@@ -138,7 +140,7 @@ export class VideoAssetsService implements OnModuleInit {
 
   async step(projectId: string): Promise<VideoStepDto> {
     const ctx = await this.video.context(projectId);
-    const mode = ctx.project.videoMode === 'single' ? 'single' : 'multi_shot';
+    const mode = ctx.project.videoMode === 'single' || ctx.project.format !== 'classic' ? 'single' : 'multi_shot';
     const jobs = await this.video.visibleJobs(projectId, mode);
     const assets = await this.prisma.asset.findMany({
       where: { videoJobId: { in: jobs.map((j) => j.id) } },
@@ -280,7 +282,7 @@ export class VideoAssetsService implements OnModuleInit {
     const asset = await this.findVideo(assetId);
     const job = await this.video.find(asset.videoJobId!);
     const ctx = await this.video.context(job.projectId);
-    const spec = await this.product.get(job.projectId);
+    const productBlocks = await this.productBlocks(ctx, this.video.expectedShots(job).map((x) => x.sceneId));
     const expected = this.video.expectedShots(job);
     const bounds = readJson(ShotBoundsSchema, asset.shotBounds, []);
     const frames = readJson(FramesSchema, asset.frames, []);
@@ -297,7 +299,7 @@ export class VideoAssetsService implements OnModuleInit {
     const result = await this.llm.call({
       task: 'assistant',
       schema: videoAssistantChecked(bounds.length),
-      system: [this.prompts.render('video-assistant'), personaBlock(ctx.project.influencer), ...(spec ? [productBlock(spec)] : [])],
+      system: [this.prompts.render('video-assistant'), personaBlock(ctx.project.influencer), ...productBlocks],
       content: [
         {
           type: 'text',
@@ -336,29 +338,30 @@ export class VideoAssetsService implements OnModuleInit {
     return { reply: out.reply.trim(), fix, checkAfter: out.checkAfter.map((c) => c.trim()).filter(Boolean) };
   }
 
-  /** Single-scene prompt for a "regenerate this shot" fix. */
+  /** The analysis of each product shown in these scenes, as system blocks (one per product). */
+  private async productBlocks(ctx: VideoContext, sceneIds: string[]): Promise<string[]> {
+    const ids = [...new Set(sceneIds.map((id) => ctx.scenes.find((s) => s.id === id)?.productId).filter((x): x is string => Boolean(x)))];
+    const blocks: string[] = [];
+    for (const id of ids) {
+      const spec = await this.product.forProduct(id);
+      const title = ctx.project.products.find((p) => p.id === id)?.title;
+      if (spec) blocks.push(ids.length > 1 ? `## Product: ${title}\n${productBlock(spec)}` : productBlock(spec));
+    }
+    return blocks;
+  }
+
+  /** Single-scene prompt for a "regenerate this shot" fix (start and end frames for a transition). */
   fixCard(fix: StoredVideoFix, ctx: VideoContext): { prompt: string; attachments: StoredAttachment[]; missing: string[] } | null {
     const scene = ctx.scenes.find((s) => s.id === fix.sceneId);
     if (!scene) return null;
-    const missing: string[] = [];
+    const { attachments, missing } = this.video.frames(ctx, scene);
     let prompt = '';
     try {
-      prompt = buildSinglePrompt({ ...ctx.persona, motion: fix.motion ?? scene.motion }, this.prompts);
+      prompt = this.video.singlePrompt(ctx, scene, fix.motion ?? undefined);
     } catch (error) {
       if (!(error instanceof VideoPromptError)) throw error;
       missing.push(error.message);
     }
-    const attachments: StoredAttachment[] = [];
-    if (scene.approvedAsset) {
-      attachments.push({
-        index: 1,
-        kind: 'asset',
-        id: scene.approvedAsset.id,
-        path: scene.approvedAsset.path,
-        label: `Start image (scene ${scene.order + 1})`,
-        fileName: `1_start_scene${String(scene.order + 1).padStart(2, '0')}${path.extname(scene.approvedAsset.path)}`,
-      });
-    } else missing.push(`Scene ${scene.order + 1} has no approved image.`);
     return { prompt, attachments, missing };
   }
 
@@ -502,21 +505,35 @@ export class VideoAssetsService implements OnModuleInit {
       ].join('\n');
     });
 
-    const productInFrame = bounds.some((b) => {
-      const s = sceneOf(b.sceneId);
-      return s && (s.showsProduct || s.outfitState === 'wearing_product');
-    });
     const compare: LlmPart[] = [];
     if (ctx.anchor) compare.push({ type: 'image', path: ctx.anchor.path, label: `Reference: ${ctx.persona.name.split(' ')[0]}'s anchor (her face)` });
-    if (productInFrame) {
-      const products = [...ctx.project.productImages].sort((a, b) => Number(b.role === 'front') - Number(a.role === 'front') || a.order - b.order);
-      for (const p of products.filter((p) => p.role === 'front' || p.role === 'detail').slice(0, 2)) {
-        compare.push({ type: 'image', path: p.path, label: `Product image (${p.role})` });
+    // The front and detail photos of each product the shots show or she wears.
+    const shown = [
+      ...new Set(
+        bounds
+          .map((b) => sceneOf(b.sceneId))
+          .filter((s) => s && (s.showsProduct || s.outfitState === 'wearing_product'))
+          .map((s) => s!.productId)
+          .filter((x): x is string => Boolean(x)),
+      ),
+    ];
+    for (const id of shown) {
+      const product = ctx.project.products.find((p) => p.id === id);
+      if (!product) continue;
+      const images = [...product.images].sort((a, b) => Number(b.role === 'front') - Number(a.role === 'front') || a.order - b.order);
+      for (const im of images.filter((im) => im.role === 'front' || im.role === 'detail').slice(0, shown.length > 1 ? 1 : 2)) {
+        compare.push({ type: 'image', path: im.path, label: `Product image (${shown.length > 1 ? `${product.title}, ` : ''}${im.role})` });
       }
     }
     bounds.forEach((b, i) => {
       const s = sceneOf(b.sceneId);
-      if (s?.approvedAsset) compare.push({ type: 'image', path: s.approvedAsset.path, label: `Approved still for shot ${i + 1} (the look it should keep)` });
+      const before = s ? ctx.beforeOf.get(s.id) : undefined;
+      if (before?.approvedAsset) {
+        compare.push({ type: 'image', path: before.approvedAsset.path, label: `Start frame of shot ${i + 1}: her own clothes before the outfit change` });
+      }
+      if (s?.approvedAsset) {
+        compare.push({ type: 'image', path: s.approvedAsset.path, label: before ? `End frame of shot ${i + 1}: the outfit and look it must end on` : `Approved still for shot ${i + 1} (the look it should keep)` });
+      }
     });
 
     const frameParts: LlmPart[] = frames.map((f) => {
@@ -530,7 +547,7 @@ export class VideoAssetsService implements OnModuleInit {
     const asset = await this.findVideo(assetId);
     const job = await this.video.find(asset.videoJobId!);
     const ctx = await this.video.context(job.projectId);
-    const spec = await this.product.get(job.projectId);
+    const productBlocks = await this.productBlocks(ctx, this.video.expectedShots(job).map((x) => x.sceneId));
     const expected = this.video.expectedShots(job);
     const bounds = readJson(ShotBoundsSchema, asset.shotBounds, []);
     const frames = readJson(FramesSchema, asset.frames, []);
@@ -542,7 +559,7 @@ export class VideoAssetsService implements OnModuleInit {
       task: 'video_review',
       modelKind: 'review',
       schema: videoReviewChecked({ shotCount: bounds.length, durationSec: duration }),
-      system: [this.prompts.render('video-review'), personaBlock(ctx.project.influencer), ...(spec ? [productBlock(spec)] : [])],
+      system: [this.prompts.render('video-review'), personaBlock(ctx.project.influencer), ...productBlocks],
       content: [
         {
           type: 'text',
@@ -671,8 +688,11 @@ export class VideoAssetsService implements OnModuleInit {
    */
   async syncSegments(projectId: string): Promise<void> {
     const project = await this.projects.find(projectId);
-    const mode = project.videoMode === 'single' ? 'single' : 'multi_shot';
-    const scenes = await this.prisma.scene.findMany({ where: { projectId }, orderBy: { order: 'asc' } });
+    const mode = project.videoMode === 'single' || project.format !== 'classic' ? 'single' : 'multi_shot';
+    // A transition's "before" still is only a start frame: it has no segment of its own.
+    const scenes = (await this.prisma.scene.findMany({ where: { projectId }, orderBy: { order: 'asc' } })).filter((s) =>
+      hasSegment(readJson(z.enum(SCENE_TYPES), s.type, 'custom')),
+    );
     const jobs = await this.prisma.videoJob.findMany({
       where: { projectId, OR: [{ purpose: 'replacement' }, { purpose: 'main', mode }] },
       include: { assets: { where: { status: 'approved' }, include: { reviews: { orderBy: { createdAt: 'desc' }, take: 1 } }, orderBy: { version: 'desc' } } },

@@ -16,6 +16,7 @@ import type {
   SceneType,
   ShotKind,
   SourceKey,
+  StoryFormat,
   Verdict,
   VideoFixKind,
   VideoJobPurpose,
@@ -97,15 +98,45 @@ export interface ProductImageDto {
   order: number;
 }
 
+export interface ProductSourceDto {
+  id: string;
+  key: SourceKey;
+  displayName: string;
+  logoUrl: string | null;
+}
+
+export interface ProductDto {
+  id: string;
+  /** 1-based, as used in storyboards and the DM. */
+  number: number;
+  title: string;
+  note: string;
+  source: ProductSourceDto;
+  priceInr: number;
+  priceModeOverride: PriceMode | null;
+  /** The mode actually used for the badge: the override, or the store's mode. */
+  priceMode: PriceMode;
+  priceLabel: string | null;
+  productUrl: string | null;
+  affiliateLink: string | null;
+  images: ProductImageDto[];
+  analyzed: boolean;
+}
+
 export interface ProjectSummaryDto {
   id: string;
-  productTitle: string;
-  priceInr: number;
+  format: StoryFormat;
+  /** The Reel's headline (classic: the product title). */
+  title: string;
   occasion: string;
   status: ProjectStatus;
   furthestStatus: ProjectStatus;
   influencer: { id: string; name: string; anchorUrl: string | null };
-  source: { id: string; key: SourceKey; displayName: string };
+  productCount: number;
+  /** Lowest and highest product price. */
+  priceRange: { min: number; max: number };
+  /** The stores of its products, without repeats. */
+  sources: Array<{ id: string; key: SourceKey; displayName: string }>;
   coverUrl: string | null;
   sceneCount: number;
   createdAt: string;
@@ -114,19 +145,14 @@ export interface ProjectSummaryDto {
 }
 
 export interface ProjectDto extends ProjectSummaryDto {
-  priceModeOverride: PriceMode | null;
-  /** The mode actually used for the badge: the override, or the source's mode. */
-  priceMode: PriceMode;
-  priceLabel: string | null;
-  productUrl: string | null;
-  affiliateLink: string | null;
   videoMode: VideoMode;
-  productImages: ProductImageDto[];
+  products: ProductDto[];
 }
 
 export interface ProductSpecDto {
   id: string;
   projectId: string;
+  productId: string;
   spec: ProductSpec;
   mustMatch: MustMatchItem[];
   unknowns: string[];
@@ -154,6 +180,7 @@ export interface SceneDto {
   imageModelReason: string;
   motion: string;
   backgroundId: string | null;
+  productId: string | null;
   imagePrompt: string;
   promptOverride: boolean;
   card: PromptCardDto;
@@ -172,6 +199,8 @@ export interface BackgroundDto {
 export interface StoryboardDto {
   scenes: SceneDto[];
   backgrounds: BackgroundDto[];
+  /** The project's products, numbered as the storyboard refers to them. */
+  products: Array<{ id: string; number: number; title: string; priceLabel: string | null }>;
   notes: string[];
   totalSec: number;
   ctaSec: number;
@@ -539,6 +568,10 @@ export interface ComposeSegmentDto {
   detections: DetectionsDto;
   /** Frames (video times) used for detection and previews. */
   sampleTimes: number[];
+  /** The product this segment shows (its badge: store logo and price), or null. */
+  product: { id: string; title: string; priceLabel: string | null; priceMode: PriceMode; store: string; logoUrl: string | null } | null;
+  /** The badge image at scale 1 (output pixels), or null when there is nothing to show. */
+  badge: { url: string; w: number; h: number } | null;
 }
 
 export interface CtaDto {
@@ -571,10 +604,6 @@ export interface CaptionPackageDto {
 
 export interface ComposeStepDto {
   segments: ComposeSegmentDto[];
-  badge: { url: string; w: number; h: number } | null;
-  priceLabel: string | null;
-  priceMode: PriceMode;
-  source: { displayName: string; logoUrl: string | null };
   safeZone: { top: number; bottom: number; rightLower: number; marginPx: number };
   cta: CtaDto;
   ctaPreviewUrl: string;

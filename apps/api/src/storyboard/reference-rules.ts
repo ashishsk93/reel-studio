@@ -31,11 +31,16 @@ export interface SelectionInput {
   maxRefs: number;
   /** Her room for this scene (a reference tagged "background"), attached last. */
   background?: RefCandidate | null;
+  /**
+   * Transitions: the approved "before" still, attached last as the pose reference. It already shows
+   * the room, so it replaces the background.
+   */
+  pose?: { id: string; path: string } | null;
 }
 
 export interface SelectedAttachment {
   index: number;
-  kind: 'reference' | 'product';
+  kind: 'reference' | 'product' | 'asset';
   id: string;
   path: string;
   label: string;
@@ -48,6 +53,10 @@ export interface Selection {
   personCount: number;
   /** Number of the background image (always the last attachment), or null. */
   backgroundIndex: number | null;
+  /** Number of the pose reference (always the last attachment), or null. */
+  poseIndex: number | null;
+  /** How many product images are attached (they follow the people). */
+  productCount: number;
   missing: string[];
   notes: string[];
 }
@@ -142,9 +151,12 @@ export function selectAttachments(input: SelectionInput): Selection {
   const keepProducts = products.slice(0, 1);
   const extraPeople = people.slice(1);
   const extraProducts = products.slice(1);
-  const background = input.background && limit - keepPeople.length - keepProducts.length > 0 ? input.background : null;
-  if (input.background && !background) notes.push(`Left out the background to stay within ${limit} images.`);
-  let room = limit - keepPeople.length - keepProducts.length - (background ? 1 : 0);
+  const fits = limit - keepPeople.length - keepProducts.length > 0;
+  const pose = input.pose && fits ? input.pose : null;
+  if (input.pose && !pose) notes.push(`Left out the pose reference to stay within ${limit} images.`);
+  const background = !input.pose && input.background && fits ? input.background : null;
+  if (!input.pose && input.background && !background) notes.push(`Left out the background to stay within ${limit} images.`);
+  let room = limit - keepPeople.length - keepProducts.length - (background || pose ? 1 : 0);
   while (room > 0 && extraPeople.length) {
     keepPeople.push(extraPeople.shift()!);
     room--;
@@ -198,5 +210,18 @@ export function selectAttachments(input: SelectionInput): Selection {
     });
   }
 
-  return { attachments, personCount: keepPeople.length, backgroundIndex, missing, notes };
+  let poseIndex: number | null = null;
+  if (pose) {
+    poseIndex = attachments.length + 1;
+    attachments.push({
+      index: poseIndex,
+      kind: 'asset',
+      id: pose.id,
+      path: pose.path,
+      label: 'Pose reference (before still)',
+      fileName: `${poseIndex}_pose_before${ext(pose.path)}`,
+    });
+  }
+
+  return { attachments, personCount: keepPeople.length, backgroundIndex, poseIndex, productCount: keepProducts.length, missing, notes };
 }

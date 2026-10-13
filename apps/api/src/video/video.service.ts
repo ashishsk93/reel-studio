@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 import {
+  SCENE_TYPES,
   VIDEO_JOB_PURPOSES,
+  hasSegment,
   VIDEO_MODES,
   videoPromptChecked,
   type ExpectedShotDto,
@@ -12,7 +14,7 @@ import {
   type VideoJobUpdate,
   type VideoMode,
 } from '@reel/shared';
-import type { Asset, Influencer, ProductImage, Project, ReferenceImage, Scene, VideoJob } from '../generated/prisma/client';
+import type { Asset, Influencer, Product, ProductImage, Project, ReferenceImage, Scene, VideoJob } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { personaOf, refTags } from '../influencers/influencer.mapper';
 import { forbiddenReminder, slugify } from '../influencers/persona-text';
@@ -25,7 +27,7 @@ import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import type { StoredAttachment } from '../assets/edit-prompt';
 import { creditEstimate, planMultiShot, planSingle, type PlanOptions } from './plan';
-import { VideoPromptError, buildMultiShotPrompt, buildSinglePrompt, shotMarker } from './video-prompt';
+import { VideoPromptError, buildMultiShotPrompt, buildSinglePrompt, buildTransitionPrompt, shotMarker } from './video-prompt';
 
 export const VIDEO_PROMPT_JOB = 'video.prompt';
 const RewritePayload = z.object({ jobId: z.string(), instruction: z.string() });
@@ -45,11 +47,15 @@ const JobSettingsSchema = z.object({ resolution: z.string(), sound: z.boolean(),
 export type SceneWithImage = Scene & { approvedAsset: Asset | null };
 
 export interface VideoContext {
-  project: Project & { influencer: Influencer & { references: ReferenceImage[] }; productImages: ProductImage[] };
+  project: Project & { influencer: Influencer & { references: ReferenceImage[] }; products: Array<Product & { images: ProductImage[] }> };
   persona: { name: string; forbiddenFeatures: string[] };
+  /** Scenes that become a Reel segment (a transition's "before" still is only a start frame). */
   scenes: SceneWithImage[];
+  /** Every scene, including transition "before" stills. */
+  allScenes: SceneWithImage[];
+  /** A transition's "after" scene id → its "before" still scene. */
+  beforeOf: Map<string, SceneWithImage>;
   anchor: ReferenceImage | null;
-  productFront: ProductImage | null;
   template: SettingValue<'video.multiShotTemplate'>;
   tools: SettingValue<'tools.video'>;
 }
@@ -98,19 +104,24 @@ export class VideoService implements OnModuleInit {
   async context(projectId: string): Promise<VideoContext> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { influencer: { include: { references: true } }, productImages: true },
+      include: { influencer: { include: { references: true } }, products: { include: { images: true }, orderBy: { order: 'asc' } } },
     });
     if (!project) throw new NotFoundException('Project not found');
-    const scenes = await this.prisma.scene.findMany({ where: { projectId }, include: { approvedAsset: true }, orderBy: { order: 'asc' } });
+    const allScenes = await this.prisma.scene.findMany({ where: { projectId }, include: { approvedAsset: true }, orderBy: { order: 'asc' } });
     const [template, tools] = await Promise.all([this.settings.get('video.multiShotTemplate'), this.settings.get('tools.video')]);
     const refs = [...project.influencer.references].sort((a, b) => a.sortOrder - b.sortOrder);
-    const products = [...project.productImages].sort((a, b) => a.order - b.order);
+    const beforeOf = new Map<string, SceneWithImage>();
+    allScenes.forEach((s, i) => {
+      const prev = allScenes[i - 1];
+      if (s.type === 'transition_after' && prev?.type === 'transition_before' && prev.productId === s.productId) beforeOf.set(s.id, prev);
+    });
     return {
       project,
       persona: { name: project.influencer.name, ...personaOf(project.influencer) },
-      scenes,
+      scenes: allScenes.filter((s) => hasSegment(readJson(z.enum(SCENE_TYPES), s.type, 'custom'))),
+      allScenes,
+      beforeOf,
       anchor: refs.find((r) => refTags(r).includes('anchor')) ?? null,
-      productFront: products.find((p) => p.role === 'front') ?? products.find((p) => p.role !== 'back') ?? null,
       template,
       tools,
     };
@@ -133,20 +144,11 @@ export class VideoService implements OnModuleInit {
     if (scenes.some((s) => !s)) missing.push('A scene of this run was deleted; regenerate the video prompts.');
     const present = scenes.filter((s): s is SceneWithImage => Boolean(s));
 
-    const attachments: StoredAttachment[] = [];
     const first = present[0];
-    if (first?.approvedAsset) {
-      attachments.push({
-        index: 1,
-        kind: 'asset',
-        id: first.approvedAsset.id,
-        path: first.approvedAsset.path,
-        label: `Start image (scene ${first.order + 1})`,
-        fileName: `1_start_scene${pad2(first.order + 1)}${ext(first.approvedAsset.path)}`,
-      });
-    } else if (first) {
-      missing.push(`Scene ${first.order + 1} has no approved image.`);
-    }
+    const frames = first ? this.frames(ctx, first) : { attachments: [], missing: [] };
+    const attachments: StoredAttachment[] = frames.attachments;
+    missing.push(...frames.missing);
+    if (attachments.length === 2) notes.push('In Kling: image 1 is the start frame, image 2 the end frame.');
 
     // Kling 3.0 on Higgsfield takes a start frame (and optionally an end frame), no reference images.
     if (present.length > 1) {
@@ -166,7 +168,7 @@ export class VideoService implements OnModuleInit {
                 ...ctx.persona,
                 shots: shots.map((s, i) => ({ start: s.start, end: s.end, description: scenes[i]?.description ?? '', motion: scenes[i]?.motion ?? '' })),
               })
-            : buildSinglePrompt({ ...ctx.persona, motion: present[0]?.motion ?? '' }, this.prompts);
+            : this.singlePrompt(ctx, present[0]);
       } catch (error) {
         if (!(error instanceof VideoPromptError)) throw error;
         prompt = '';
@@ -175,6 +177,43 @@ export class VideoService implements OnModuleInit {
     }
     if (prompt.length > 2500) notes.push(`The prompt is ${prompt.length} characters; Kling accepts up to 2,500.`);
     return { prompt, attachments, missing, notes };
+  }
+
+  /** Start frame (and, for a transition, the end frame) of a single-scene generation. */
+  frames(ctx: VideoContext, scene: SceneWithImage): { attachments: StoredAttachment[]; missing: string[] } {
+    const before = ctx.beforeOf.get(scene.id);
+    const list: Array<{ s: SceneWithImage; label: string; name: string }> = before
+      ? [
+          { s: before, label: `Start frame (scene ${before.order + 1}, before)`, name: 'start' },
+          { s: scene, label: `End frame (scene ${scene.order + 1}, after)`, name: 'end' },
+        ]
+      : [{ s: scene, label: `Start image (scene ${scene.order + 1})`, name: 'start' }];
+    const attachments: StoredAttachment[] = [];
+    const missing: string[] = [];
+    for (const { s, label, name } of list) {
+      if (!s.approvedAsset) {
+        missing.push(`Scene ${s.order + 1} has no approved image.`);
+        continue;
+      }
+      const index = attachments.length + 1;
+      attachments.push({
+        index,
+        kind: 'asset',
+        id: s.approvedAsset.id,
+        path: s.approvedAsset.path,
+        label,
+        fileName: `${index}_${name}_scene${pad2(s.order + 1)}${ext(s.approvedAsset.path)}`,
+      });
+    }
+    return { attachments, missing };
+  }
+
+  /** Single-scene prompt: the transition prompt for a transition's "after" scene, else the image-to-video pattern. */
+  singlePrompt(ctx: VideoContext, scene: SceneWithImage | undefined, motion?: string): string {
+    const m = motion ?? scene?.motion ?? '';
+    return scene && ctx.beforeOf.has(scene.id)
+      ? buildTransitionPrompt({ ...ctx.persona, motion: m }, this.prompts)
+      : buildSinglePrompt({ ...ctx.persona, motion: m }, this.prompts);
   }
 
   toCard(built: BuiltJob): PromptCardDto {
@@ -230,9 +269,10 @@ export class VideoService implements OnModuleInit {
   async generate(projectId: string, force = false): Promise<void> {
     const ctx = await this.context(projectId);
     if (ctx.scenes.length === 0) throw new BadRequestException('Plan the storyboard first.');
-    const missing = ctx.scenes.filter((s) => !s.approvedAssetId).map((s) => s.order + 1);
+    const missing = ctx.allScenes.filter((s) => !s.approvedAssetId).map((s) => s.order + 1);
     if (missing.length) throw new BadRequestException(`Approve an image for scene ${missing.join(', ')} first.`);
-    const mode = readJson(z.enum(VIDEO_MODES), ctx.project.videoMode, 'multi_shot');
+    // Multi-shot runs only make sense for one product's scenes; other formats always generate per scene.
+    const mode = ctx.project.format === 'classic' ? readJson(z.enum(VIDEO_MODES), ctx.project.videoMode, 'multi_shot') : 'single';
 
     const existing = await this.prisma.videoJob.findMany({ where: { projectId, mode, purpose: 'main' }, include: { _count: { select: { assets: true } } } });
     const uploads = existing.reduce((n, j) => n + j._count.assets, 0);
@@ -248,6 +288,7 @@ export class VideoService implements OnModuleInit {
       await tx.videoJob.deleteMany({ where: { id: { in: existing.map((j) => j.id) } } });
       for (const [order, p] of plan.entries()) {
         const first = ctx.scenes.find((s) => s.id === p.sceneIds[0])!;
+        const before = mode === 'single' ? ctx.beforeOf.get(first.id) : undefined;
         await tx.videoJob.create({
           data: {
             projectId,
@@ -256,7 +297,8 @@ export class VideoService implements OnModuleInit {
             order,
             active: true,
             prompt: '',
-            startAssetId: first.approvedAssetId!,
+            startAssetId: before?.approvedAssetId ?? first.approvedAssetId!,
+            endAssetId: before ? first.approvedAssetId : null,
             extraRefs: toJson([]),
             expectedShots: toJson(p.expectedShots),
             settings: toJson({ resolution: ctx.tools.resolution, sound: ctx.tools.sound, durationSec: p.durationSec }),
@@ -283,7 +325,10 @@ export class VideoService implements OnModuleInit {
 
   /** Switching keeps the other mode's jobs and uploads; jobs for the new mode are created once. */
   async setMode(projectId: string, mode: VideoMode): Promise<void> {
-    await this.projects.find(projectId);
+    const project = await this.projects.find(projectId);
+    if (mode === 'multi_shot' && project.format !== 'classic') {
+      throw new BadRequestException('Multi-shot runs are only available for classic Reels; this format generates one video per scene.');
+    }
     await this.prisma.project.update({ where: { id: projectId }, data: { videoMode: mode } });
     await this.prisma.videoJob.updateMany({ where: { projectId, purpose: 'main' }, data: { active: false } });
     await this.prisma.videoJob.updateMany({ where: { projectId, purpose: 'main', mode }, data: { active: true } });
@@ -302,7 +347,9 @@ export class VideoService implements OnModuleInit {
       [{ id: scene.id, order: scene.order, setting: scene.setting, outfitState: scene.outfitState, targetDurationSec: scene.targetDurationSec, onScreenText: scene.onScreenText }],
       this.planOptions(ctx.tools),
     );
-    const prompt = motion?.trim() ? buildSinglePrompt({ ...ctx.persona, motion }, this.prompts) : '';
+    const withImage = ctx.scenes.find((s) => s.id === scene.id);
+    const before = ctx.beforeOf.get(scene.id);
+    const prompt = motion?.trim() ? this.singlePrompt(ctx, withImage, motion) : '';
     const job = await this.prisma.videoJob.create({
       data: {
         projectId: scene.projectId,
@@ -312,7 +359,8 @@ export class VideoService implements OnModuleInit {
         active: true,
         prompt,
         promptOverride: Boolean(prompt),
-        startAssetId: scene.approvedAssetId,
+        startAssetId: before?.approvedAssetId ?? scene.approvedAssetId,
+        endAssetId: before ? scene.approvedAssetId : null,
         extraRefs: toJson([]),
         expectedShots: toJson(p.expectedShots),
         settings: toJson({ resolution: ctx.tools.resolution, sound: ctx.tools.sound, durationSec: p.durationSec }),

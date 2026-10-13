@@ -99,7 +99,7 @@ model Source {
   disclosureLines Json // string[]
   linkNotes       String  @default("")
 
-  projects Project[]
+  products Product[]
 }
 
 // ---------- Projects ----------
@@ -107,12 +107,9 @@ model Source {
 model Project {
   id                String    @id @default(cuid())
   influencerId      String
-  sourceId          String
-  productTitle      String
-  priceInr          Int
-  priceModeOverride String?
-  productUrl        String?
-  affiliateLink     String?
+  format            String    @default("classic") // classic | haul | occasion | transition | three_ways (docs/formats.md)
+  /// The Reel's headline: "Kurtis under ₹499", "3 Diwali looks"; for classic, the product title.
+  title             String
   occasion          String
   status            String    @default("draft")
   furthestStatus    String    @default("draft")
@@ -123,9 +120,9 @@ model Project {
   updatedAt         DateTime  @updatedAt
 
   influencer    Influencer      @relation(fields: [influencerId], references: [id])
-  source        Source          @relation(fields: [sourceId], references: [id])
+  products      Product[]
   productImages ProductImage[]
-  spec          ProductSpec?
+  specs         ProductSpec[]
   scenes        Scene[]
   videoJobs     VideoJob[]
   assets        Asset[]
@@ -137,9 +134,35 @@ model Project {
   jobs          Job[]
 }
 
+// One product of a project (classic and three_ways have one; hauls up to five).
+model Product {
+  id                String   @id @default(cuid())
+  projectId         String
+  order             Int
+  title             String
+  sourceId          String
+  priceInr          Int
+  priceModeOverride String?
+  productUrl        String?
+  affiliateLink     String?
+  /// Short line shown on screen in hauls, e.g. "Pure cotton, 3 colours".
+  note              String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source  Source         @relation(fields: [sourceId], references: [id])
+  images  ProductImage[]
+  spec    ProductSpec?
+  scenes  Scene[]
+
+  @@index([projectId, order])
+}
+
 model ProductImage {
   id        String @id @default(cuid())
   projectId String
+  productId String
   path      String
   width     Int
   height    Int
@@ -147,13 +170,16 @@ model ProductImage {
   order     Int
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([projectId, order])
+  @@index([productId, order])
 }
 
 model ProductSpec {
   id               String   @id @default(cuid())
-  projectId        String   @unique
+  projectId        String
+  productId        String   @unique
   spec             Json
   mustMatch        Json // { key, label, expected }[]
   unknowns         Json // string[]
@@ -163,11 +189,15 @@ model ProductSpec {
   updatedAt        DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model Scene {
   id                String   @id @default(cuid())
   projectId         String
+  productId         String? // the product this scene shows; null for a hook that shows none
   order             Int
   type              String
   purpose           String
@@ -191,6 +221,7 @@ model Scene {
   updatedAt         DateTime @updatedAt
 
   project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product       Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
   assets        Asset[]            @relation("SceneAssets")
   approvedAsset Asset?             @relation("SceneApproved", fields: [approvedAssetId], references: [id], onDelete: SetNull)
   segment       Segment?
@@ -264,6 +295,7 @@ model VideoJob {
   prompt         String
   promptOverride Boolean  @default(false) // prompt edited by hand or rewritten by Claude; don't rebuild
   startAssetId   String
+  endAssetId     String? // transitions: the Kling end frame
   extraRefs      Json // AttachmentRef[]
   expectedShots  Json // { sceneId, start, end, text }[]
   settings       Json

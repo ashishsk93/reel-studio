@@ -16,6 +16,7 @@ import { z } from 'zod';
 import {
   IdOrderSchema,
   ProductImageUpdateSchema,
+  ProductUpdateSchema,
   ProjectGotoSchema,
   ProjectUpdateSchema,
 } from '@reel/shared';
@@ -33,7 +34,7 @@ export class ProjectsController {
     return this.projects.list();
   }
 
-  /** Multipart: `images` files, `roles` JSON array (one per file), plus the project fields. */
+  /** Multipart: the project fields, `products` (JSON array, each with `imageCount`), `images` in product order and `roles`. */
   @Post('projects')
   @UseInterceptors(FilesInterceptor('images'))
   create(@UploadedFiles() files: Express.Multer.File[], @Body() fields: Record<string, unknown>) {
@@ -66,13 +67,35 @@ export class ProjectsController {
     return this.projects.markPosted(id, body.posted);
   }
 
-  @Post('projects/:id/product-images')
+  /** Multipart: the product fields, its `images` and `roles`. */
+  @Post('projects/:id/products')
+  @UseInterceptors(FilesInterceptor('images'))
+  addProduct(@Param('id') id: string, @UploadedFiles() files: Express.Multer.File[], @Body() fields: Record<string, unknown>) {
+    return this.projects.addProduct(id, files, fields);
+  }
+
+  @Put('projects/:id/products/order')
+  reorderProducts(@Param('id') id: string, @Body(new ZodPipe(IdOrderSchema)) body: z.output<typeof IdOrderSchema>) {
+    return this.projects.reorderProducts(id, body.ids);
+  }
+
+  @Patch('products/:id')
+  updateProduct(@Param('id') id: string, @Body(new ZodPipe(ProductUpdateSchema)) body: z.output<typeof ProductUpdateSchema>) {
+    return this.projects.updateProduct(id, body);
+  }
+
+  @Delete('products/:id')
+  removeProduct(@Param('id') id: string) {
+    return this.projects.removeProduct(id);
+  }
+
+  @Post('products/:id/images')
   @UseInterceptors(FilesInterceptor('images'))
   addImages(@Param('id') id: string, @UploadedFiles() files: Express.Multer.File[], @Body() fields: Record<string, unknown>) {
     return this.projects.addImages(id, files, fields);
   }
 
-  @Put('projects/:id/product-images/order')
+  @Put('products/:id/images/order')
   reorder(@Param('id') id: string, @Body(new ZodPipe(IdOrderSchema)) body: z.output<typeof IdOrderSchema>) {
     return this.projects.reorderImages(id, body.ids);
   }

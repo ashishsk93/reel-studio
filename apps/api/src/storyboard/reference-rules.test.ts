@@ -93,6 +93,14 @@ describe('reference selection rules', () => {
     expect(selectAttachments(input({})).backgroundIndex).toBeNull();
   });
 
+  it('attaches the before still as the pose reference instead of the background', () => {
+    const room = ref('room', ['background'], 9);
+    const s = selectAttachments(input({ maxRefs: 4, background: room, pose: { id: 'before', path: 'scenes/before.jpg' } }));
+    expect(ids(s)).toEqual(['anc', 'front', 'p-front', 'before']);
+    expect(s).toMatchObject({ poseIndex: 4, backgroundIndex: null, productCount: 1 });
+    expect(s.attachments[3]).toMatchObject({ kind: 'asset', fileName: '4_pose_before.jpg' });
+  });
+
   it('falls back and reports missing references', () => {
     const onlyAnchor = selectAttachments(input({ references: [ref('anc', ['anchor'])], shotKind: 'three_quarter' }));
     expect(onlyAnchor.missing).toEqual(['No "base_three_quarter" reference for Aanya yet']);

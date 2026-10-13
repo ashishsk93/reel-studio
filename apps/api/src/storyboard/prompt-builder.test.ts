@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { storyboardChecked, type StoryboardScene } from '@reel/shared';
+import { formatIssues, segmentSeconds, storyboardChecked, type StoryboardConstraints, type StoryboardScene } from '@reel/shared';
 import { PromptService } from '../llm/prompt.service';
 import { SEED_INFLUENCERS } from '../../prisma/seed-data/influencers';
 import { SAMPLE_GARMENT } from '../influencers/sample-prompt';
@@ -84,6 +84,7 @@ describe('storyboard validation', () => {
     shotKind: 'medium',
     outfitState: 'own_clothes',
     showsProduct: true,
+    product: 1,
     setting: 'bedroom',
     place: null,
     description: 'She holds it up.',
@@ -95,7 +96,8 @@ describe('storyboard validation', () => {
     motion: 'smiles',
     ...over,
   });
-  const constraints = { backKnown: false, pieceCount: 1, availableRoles: ['front', 'detail'], minTotalSec: 13, maxTotalSec: 17, placeCount: 0 };
+  const product = { backKnown: false, pieceCount: 1, availableRoles: ['front', 'detail'] };
+  const constraints: StoryboardConstraints = { format: 'classic', products: [product], minTotalSec: 13, maxTotalSec: 17, placeCount: 0 };
   const check = (scenes: StoryboardScene[]) => storyboardChecked(constraints).safeParse({ scenes, notes: [] });
 
   it('accepts a sensible storyboard', () => {
@@ -113,11 +115,16 @@ describe('storyboard validation', () => {
     ]);
     expect(result.success).toBe(false);
     const messages = result.error!.issues.map((i) => i.message).join(' | ');
-    expect(messages).toContain('back of the product is unknown');
-    expect(messages).toContain('one piece');
-    expect(messages).toContain('not uploaded: back');
+    expect(messages).toContain('back of product 1 is unknown');
+    expect(messages).toContain('product 1 has one piece');
+    expect(messages).toContain('not uploaded for product 1: back');
     expect(messages).toContain('3-7 words');
     expect(messages).toContain('placeholders');
+  });
+
+  it('needs a product number on scenes that show or wear one', () => {
+    const result = check([scene({ product: null }), scene({}), scene({}), scene({}), scene({ targetDurationSec: 3 })]);
+    expect(result.error!.issues[0].message).toContain('set product to its number');
   });
 
   it('enforces the total duration', () => {
@@ -126,10 +133,67 @@ describe('storyboard validation', () => {
   });
 });
 
+describe('transition pose reference', () => {
+  it('numbers the products and asks to keep the pose when the before still is attached', () => {
+    const prompt = buildImagePrompt(
+      {
+        persona: aanya,
+        scene: { outfitState: 'wearing_product', showsProduct: true, description: 'Full-body front view, mid-spin.' },
+        garmentParagraph: SAMPLE_GARMENT,
+        personCount: 1,
+        poseIndex: 3,
+        productCount: 1,
+      },
+      prompts,
+    );
+    expect(prompt).toMatch(/^Image 1 shows Aanya\. Image 2 shows a product: Lavender net/);
+    expect(prompt).toContain('Image 3 shows her just before the outfit change: keep exactly the same place, pose');
+  });
+});
+
 describe('introSentence', () => {
   it('numbers images to match the attachments', () => {
     expect(introSentence('templates/image-wearing', 'Aanya', 2)).toBe('Images 1 and 2 show Aanya. The other images show a product:');
     expect(introSentence('templates/image-holding', 'Aanya', 0)).toBe('The images show a product:');
     expect(introSentence('templates/image-plain', 'Aanya', 1)).toBe('Image 1 shows Aanya.');
+  });
+});
+
+describe('format rules', () => {
+  const two = [
+    { backKnown: false, pieceCount: 1, availableRoles: ['front'] },
+    { backKnown: false, pieceCount: 1, availableRoles: ['front'] },
+  ];
+  const s = (type: StoryboardScene['type'], product: number | null) => ({ type, product });
+
+  it('haul: one hook first, then one try-on per product', () => {
+    expect(formatIssues([s('hook', null), s('try_on', 1), s('try_on', 2)], { format: 'haul', products: two })).toEqual([]);
+    const bad = formatIssues([s('try_on', 1), s('try_on', 1)], { format: 'haul', products: two });
+    expect(bad.join(' | ')).toContain('Start with exactly one "hook"');
+    expect(bad.join(' | ')).toContain('product 1 (got 2)');
+    expect(bad.join(' | ')).toContain('product 2 (got 0)');
+  });
+
+  it('transition: each before still is followed by the same product\'s after', () => {
+    const ok = [s('hook', null), s('transition_before', 1), s('transition_after', 1), s('transition_before', 2), s('transition_after', 2)];
+    expect(formatIssues(ok, { format: 'transition', products: two })).toEqual([]);
+    const swapped = [s('transition_before', 1), s('transition_before', 2), s('transition_after', 1), s('transition_after', 2)];
+    expect(formatIssues(swapped, { format: 'transition', products: two }).join(' | ')).toContain('must be followed by the "transition_after" of the same product');
+  });
+
+  it('three ways: a hook and exactly three styled looks', () => {
+    const one = [two[0]];
+    expect(formatIssues([s('hook', 1), s('styled', 1), s('styled', 1), s('styled', 1)], { format: 'three_ways', products: one })).toEqual([]);
+    expect(formatIssues([s('hook', 1), s('styled', 1)], { format: 'three_ways', products: one })[0]).toContain('exactly three "styled"');
+  });
+
+  it('only counts scenes that become video toward the length', () => {
+    expect(
+      segmentSeconds([
+        { type: 'transition_before', targetDurationSec: 2 },
+        { type: 'transition_after', targetDurationSec: 3 },
+        { type: 'hook', targetDurationSec: 2 },
+      ]),
+    ).toBe(5);
   });
 });
