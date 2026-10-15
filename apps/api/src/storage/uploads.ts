@@ -58,3 +58,23 @@ export async function inspectImage(absPath: string, originalName: string): Promi
     hasAlpha: Boolean(meta.hasAlpha),
   };
 }
+
+/** Image tools reject attachments below 300 px (Higgsfield); small listing photos are upscaled to this short side. */
+export const MIN_ATTACHMENT_SIDE = 512;
+export const UPSCALED_SHORT_SIDE = 768;
+
+/**
+ * Upscales a small image in place (Lanczos) so its short side is UPSCALED_SHORT_SIDE, keeping the
+ * format; EXIF rotation is applied. Returns the new info, and the original size when it changed.
+ */
+export async function upscaleIfSmall(absPath: string, info: ImageInfo): Promise<ImageInfo & { upscaledFrom: { width: number; height: number } | null }> {
+  const short = Math.min(info.width, info.height);
+  if (short >= MIN_ATTACHMENT_SIDE) return { ...info, upscaledFrom: null };
+  const scale = UPSCALED_SHORT_SIDE / short;
+  const width = Math.round(info.width * scale);
+  const height = Math.round(info.height * scale);
+  const pipeline = sharp(absPath).rotate().resize({ width, height, kernel: 'lanczos3' });
+  const out = await (info.format === 'png' ? pipeline.png() : info.format === 'webp' ? pipeline.webp({ quality: 95 }) : pipeline.jpeg({ quality: 95 })).toBuffer();
+  await (await import('node:fs/promises')).writeFile(absPath, out);
+  return { ...info, width, height, upscaledFrom: { width: info.width, height: info.height } };
+}

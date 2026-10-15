@@ -23,7 +23,7 @@ import { PromptService } from '../llm/prompt.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
-import { inspectImage } from '../storage/uploads';
+import { inspectImage, upscaleIfSmall } from '../storage/uploads';
 import {
   personaOf,
   refTags,
@@ -119,7 +119,7 @@ export class InfluencersService {
         throw new BadRequestException('Upload the anchor image on its own: there is only one anchor.');
       }
 
-      const infos = await Promise.all(files.map((f) => inspectImage(f.path, f.originalname)));
+      const infos = await Promise.all(files.map(async (f) => upscaleIfSmall(f.path, await inspectImage(f.path, f.originalname))));
       const last = await this.prisma.referenceImage.aggregate({ where: { influencerId: id }, _max: { sortOrder: true } });
       let order = (last._max.sortOrder ?? -1) + 1;
 

@@ -23,7 +23,7 @@ import { readJson } from '../common/json';
 import { parseOrThrow } from '../common/zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { inspectImage } from '../storage/uploads';
+import { inspectImage, upscaleIfSmall } from '../storage/uploads';
 import { projectInclude, sortProducts, toProductDto, toProductImageDto, toProjectDto, toProjectSummaryDto } from './project.mapper';
 
 const status = z.enum(PROJECT_STATUSES);
@@ -60,7 +60,8 @@ export class ProjectsService {
       if (files.length !== expected) throw new BadRequestException(`Expected ${expected} photos for the products, got ${files.length}.`);
       await this.assertInfluencer(data.influencerId);
       await Promise.all(data.products.map((p) => this.assertSource(p.sourceId)));
-      const infos = await Promise.all(files.map((f) => inspectImage(f.path, f.originalname)));
+      // Listing thumbnails can be tiny; image tools reject attachments under 300 px, so upscale them.
+      const infos = await Promise.all(files.map(async (f) => upscaleIfSmall(f.path, await inspectImage(f.path, f.originalname))));
 
       // Single-scene videos: Kling 3.0 only takes a start frame, so every scene starts from its own still.
       const project = await this.prisma.project.create({
@@ -154,7 +155,8 @@ export class ProjectsService {
       if (!files?.length) throw new BadRequestException('Add at least one photo of the product.');
       const { roles, ...data } = parseOrThrow(ProductCreateFieldsSchema, fields);
       await this.assertSource(data.sourceId);
-      const infos = await Promise.all(files.map((f) => inspectImage(f.path, f.originalname)));
+      // Listing thumbnails can be tiny; image tools reject attachments under 300 px, so upscale them.
+      const infos = await Promise.all(files.map(async (f) => upscaleIfSmall(f.path, await inspectImage(f.path, f.originalname))));
       const last = sortProducts(project.products).at(-1);
       const product = await this.prisma.product.create({
         data: { ...data, priceModeOverride: data.priceModeOverride ?? null, projectId, order: (last?.order ?? -1) + 1 },
@@ -201,7 +203,8 @@ export class ProjectsService {
       const product = await this.findProduct(productId);
       if (!files?.length) throw new BadRequestException('Attach at least one image.');
       const { roles } = parseOrThrow(ProductImagesUploadFieldsSchema, fields);
-      const infos = await Promise.all(files.map((f) => inspectImage(f.path, f.originalname)));
+      // Listing thumbnails can be tiny; image tools reject attachments under 300 px, so upscale them.
+      const infos = await Promise.all(files.map(async (f) => upscaleIfSmall(f.path, await inspectImage(f.path, f.originalname))));
       const last = await this.prisma.productImage.aggregate({ where: { productId }, _max: { order: true } });
       return await this.saveImages(productId, product.projectId, files, infos, roles, (last._max.order ?? -1) + 1);
     } finally {
