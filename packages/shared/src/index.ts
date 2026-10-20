@@ -13,3 +13,4 @@ export * from './llm/storyboard.js';
 export * from './llm/review.js';
 export * from './llm/video.js';
 export * from './llm/compose.js';
+export * from './schemas/instagram.js';

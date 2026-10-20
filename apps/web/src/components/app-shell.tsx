@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Clapperboard, Moon, Settings, Store, Sun, Users } from "lucide-react";
+import { BarChart3, Clapperboard, MessageCircleReply, Moon, Settings, Store, Sun, Users } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import type { HealthDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/projects", label: "Projects", icon: Clapperboard },
   { href: "/influencers", label: "Influencers", icon: Users },
   { href: "/sources", label: "Sources & logos", icon: Store },
+  { href: "/instagram", label: "Instagram", icon: MessageCircleReply },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/usage", label: "Usage & costs", icon: BarChart3 },
 ] as const;

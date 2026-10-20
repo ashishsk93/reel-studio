@@ -47,6 +47,10 @@ Not in the repository (git-ignored), so a fresh clone needs them: `.env` (your k
 | `DATA_DIR` | `./data` | Database, uploads, renders and logs. Relative to the repo root. |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Full paths if they aren't on your PATH. |
 | `PORT_API` / `PORT_WEB` | `4000` / `3000` | |
+| `PUBLIC_URL` | — | Public HTTPS address of the app, e.g. `https://studio.velra.tech`. Needed to publish to Instagram (Instagram downloads `final.mp4` from a signed, 3-hour link) and to receive its webhooks. |
+| `INSTAGRAM_APP_SECRET` | — | Optional. Your Meta app's Instagram app secret: checks webhook signatures and signs the video links. See [docs/instagram.md](docs/instagram.md). |
+| `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` | — | Any random string; the same one goes in the Meta app's webhook settings. |
+| `INSTAGRAM_GRAPH_VERSION` | `v26.0` | Graph API version for `graph.instagram.com`. |
 
 The API refuses to start, listing every problem at once, if the key is missing in `live` mode or FFmpeg can't be run.
 

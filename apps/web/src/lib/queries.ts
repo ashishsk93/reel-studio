@@ -10,6 +10,8 @@ import type {
   SettingValue,
   VideoStepDto,
   ComposeStepDto,
+  InstagramProjectDto,
+  InstagramStatusDto,
   RenderDto,
   InfluencerDto,
   ProductSpecDto,
@@ -141,4 +143,21 @@ export function useComposeStep(id: string) {
 
 export function useRenders(id: string) {
   return useQuery({ queryKey: projectKeys.renders(id), queryFn: () => api.get<RenderDto[]>(`/projects/${id}/renders`) });
+}
+
+export const instagramKeys = {
+  all: ["instagram"] as const,
+  status: ["instagram", "status"] as const,
+  rules: ["instagram", "rules"] as const,
+  activity: ["instagram", "activity"] as const,
+  media: ["instagram", "media"] as const,
+  project: (id: string) => ["instagram", "project", id] as const,
+};
+
+export function useInstagramStatus() {
+  return useQuery({ queryKey: instagramKeys.status, queryFn: () => api.get<InstagramStatusDto>("/instagram"), refetchInterval: 60_000 });
+}
+
+export function useProjectInstagram(id: string) {
+  return useQuery({ queryKey: instagramKeys.project(id), queryFn: () => api.get<InstagramProjectDto>(`/projects/${id}/instagram`) });
 }

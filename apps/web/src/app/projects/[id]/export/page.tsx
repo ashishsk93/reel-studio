@@ -17,6 +17,7 @@ import { useJobRefresh, useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { projectKeys, useComposeStep, useProject, useRenders } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { Expandable } from "@/components/lightbox";
+import { PublishCard } from "@/components/instagram/publish-card";
 
 const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(n / 1024)} KB`);
 
@@ -181,6 +182,8 @@ function RenderView({
             </div>
           )}
         </section>
+
+        <PublishCard projectId={project.id} renderId={render.id} />
 
         {render.qa && (
           <section className="rounded-xl border bg-card p-4">

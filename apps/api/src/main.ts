@@ -11,7 +11,7 @@ async function bootstrap(): Promise<void> {
   const config = loadConfig();
   const tools = await runStartupChecks(config);
 
-  const app = await NestFactory.create(AppModule.forRoot(config, tools), { bufferLogs: false });
+  const app = await NestFactory.create(AppModule.forRoot(config, tools), { bufferLogs: false, rawBody: true });
   app.setGlobalPrefix('api');
   app.enableCors({ origin: [config.webOrigin, `http://127.0.0.1:${config.portWeb}`] });
   app.useGlobalFilters(new HttpExceptionFilter());

@@ -105,19 +105,19 @@ model Source {
 // ---------- Projects ----------
 
 model Project {
-  id                String    @id @default(cuid())
-  influencerId      String
-  format            String    @default("classic") // classic | haul | occasion | transition | three_ways (docs/formats.md)
+  id              String    @id @default(cuid())
+  influencerId    String
+  format          String    @default("classic") // classic | haul | occasion | transition | three_ways (docs/formats.md)
   /// The Reel's headline: "Kurtis under ₹499", "3 Diwali looks"; for classic, the product title.
-  title             String
-  occasion          String
-  status            String    @default("draft")
-  furthestStatus    String    @default("draft")
-  videoMode         String    @default("multi_shot") // multi_shot | single (new projects are created as single)
-  storyboardNotes   Json? // string[] from the last storyboard generation
-  postedAt          DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  title           String
+  occasion        String
+  status          String    @default("draft")
+  furthestStatus  String    @default("draft")
+  videoMode       String    @default("multi_shot") // multi_shot | single (new projects are created as single)
+  storyboardNotes Json? // string[] from the last storyboard generation
+  postedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   influencer    Influencer      @relation(fields: [influencerId], references: [id])
   products      Product[]
@@ -438,4 +438,79 @@ model Job {
 
   @@index([status, createdAt])
   @@index([projectId])
+}
+
+// ---------- Instagram (own account only) ----------
+
+/// Single row (id "me"): the connected account and its long-lived token.
+model InstagramAccount {
+  id             String    @id @default("me")
+  igUserId       String?
+  username       String?
+  accessToken    String?
+  tokenExpiresAt DateTime?
+  /// Master switch for keyword auto-replies.
+  autoReply      Boolean   @default(true)
+  /// Poll recent posts for comments (works without webhooks, e.g. while the Meta app is in Development mode).
+  poll           Boolean   @default(true)
+  lastWebhookAt  DateTime?
+  lastPollAt     DateTime?
+  lastError      String?
+  updatedAt      DateTime  @updatedAt
+}
+
+/// "Comment LINK and I'll DM you": a keyword and what to send back.
+model InstagramRule {
+  id           String   @id @default(cuid())
+  keyword      String
+  dmText       String
+  /// Optional public reply under the comment.
+  commentReply String?
+  /// null: every post. Otherwise only comments on this media id.
+  mediaId      String?
+  /// Also answer DMs that contain the keyword (only for rules on every post).
+  matchDms     Boolean  @default(false)
+  enabled      Boolean  @default(true)
+  projectId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([mediaId])
+}
+
+/// A Reel published from the app.
+model InstagramPost {
+  id           String    @id @default(cuid())
+  projectId    String
+  renderId     String
+  status       String // queued | uploading | processing | published | failed
+  caption      String
+  firstComment String?
+  containerId  String?
+  mediaId      String?
+  permalink    String?
+  error        String?
+  createdAt    DateTime  @default(now())
+  publishedAt  DateTime?
+
+  @@index([projectId])
+}
+
+/// Every comment or DM the auto-replier acted on (or skipped), so nobody gets the same DM twice.
+model InstagramReply {
+  id           String   @id @default(cuid())
+  kind         String // comment | dm
+  /// Comment id or message id.
+  sourceId     String   @unique
+  mediaId      String?
+  fromId       String
+  fromUsername String?
+  text         String
+  ruleId       String?
+  status       String // sent | failed | skipped
+  detail       String?
+  createdAt    DateTime @default(now())
+
+  @@index([fromId, ruleId])
+  @@index([createdAt])
 }

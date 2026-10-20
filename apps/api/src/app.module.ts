@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module';
 import type { AppConfig } from './config/env';
 import type { ToolVersions } from './config/startup-checks';
 import { HealthController } from './health/health.controller';
+import { InstagramModule } from './instagram/instagram.module';
 import { InfluencersModule } from './influencers/influencers.module';
 import { ProjectsModule } from './projects/projects.module';
 import { JobsModule } from './jobs/jobs.module';
@@ -35,6 +36,7 @@ export class AppModule {
         RenderModule,
         SourcesModule,
         UsageModule,
+        InstagramModule,
       ],
       controllers: [HealthController],
     };

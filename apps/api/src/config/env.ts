@@ -25,6 +25,14 @@ export interface AppConfig {
   /** Absolute origin used to build file URLs, e.g. http://localhost:4000 */
   apiOrigin: string;
   webOrigin: string;
+  /** Public HTTPS origin the API is reachable at (webhooks, media for publishing); '' when local only. */
+  publicUrl: string;
+  instagram: {
+    appSecret: string;
+    verifyToken: string;
+    apiUrl: string;
+    graphVersion: string;
+  };
 }
 
 const EnvSchema = z.object({
@@ -43,6 +51,13 @@ const EnvSchema = z.object({
   FFPROBE_PATH: z.string().trim().default('ffprobe'),
   PORT_API: z.coerce.number().int().positive().default(4000),
   PORT_WEB: z.coerce.number().int().positive().default(3000),
+  /** e.g. https://studio.velra.tech. Needed to publish to Instagram and receive its webhooks. */
+  PUBLIC_URL: z.string().trim().url().optional(),
+  /** Optional: Instagram API with Instagram Login (your own account). App secret signs webhooks and media links. */
+  INSTAGRAM_APP_SECRET: z.string().trim().default(''),
+  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().trim().default(''),
+  INSTAGRAM_API_URL: z.string().trim().url().default('https://graph.instagram.com'),
+  INSTAGRAM_GRAPH_VERSION: z.string().trim().regex(/^v\d+\.\d+$/).default('v26.0'),
 });
 
 /** Walks up from `start` to the folder holding pnpm-workspace.yaml. */
@@ -93,5 +108,12 @@ export function loadConfig(options: { repoRoot?: string; env?: NodeJS.ProcessEnv
     portWeb: env.PORT_WEB,
     apiOrigin: `http://localhost:${env.PORT_API}`,
     webOrigin: `http://localhost:${env.PORT_WEB}`,
+    publicUrl: (env.PUBLIC_URL ?? '').replace(/\/$/, ''),
+    instagram: {
+      appSecret: env.INSTAGRAM_APP_SECRET,
+      verifyToken: env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
+      apiUrl: env.INSTAGRAM_API_URL.replace(/\/$/, ''),
+      graphVersion: env.INSTAGRAM_GRAPH_VERSION,
+    },
   };
 }
