@@ -2,11 +2,12 @@
 #
 # Reel Studio: deploy main on the server.
 #
-#   sudo ./scripts/deploy.sh              pull, install, migrate, build, restart
+#   sudo ./scripts/deploy.sh              pull, install, build, migrate, restart
 #   sudo ./scripts/deploy.sh --rollback   go back to the previously deployed commit
 #
 # The build runs before either service is touched, so a broken build fails the
-# deploy and the running version keeps serving. Setup: docs/hosting.md.
+# deploy and the running version keeps serving. The API then stops for a few
+# seconds while migrations run (SQLite has one writer). Setup: docs/hosting.md.
 #
 APP_DIR="${APP_DIR:-/srv/reel-studio}"
 BRANCH="${BRANCH:-main}"
@@ -80,13 +81,19 @@ as_app "corepack pnpm install --frozen-lockfile"
 [ -n "$(ls -A apps/web/public/mediapipe 2>/dev/null)" ] || as_app "corepack pnpm --filter @reel/web mediapipe"
 ok "dependencies"
 
-bold "Database"
-as_app "corepack pnpm --filter @reel/api exec prisma migrate deploy"
-ok "migrations applied"
-
 bold "Build"
 as_app "corepack pnpm build"
 ok "built (API URL $PUBLIC_URL)"
+
+# SQLite allows one writer, and the running API (job worker, Instagram poller) holds
+# the database, so migrations wait until it's stopped. That's the only downtime:
+# a few seconds, after the build has already succeeded.
+bold "Database"
+systemctl stop reel-studio-api
+trap 'systemctl start reel-studio-api; die "migration failed at line $LINENO; the API was started again on the old database. Logs above."' ERR
+as_app "corepack pnpm --filter @reel/api exec prisma migrate deploy"
+trap 'die "failed at line $LINENO."' ERR
+ok "migrations applied"
 
 bold "Restart"
 systemctl restart "${SERVICES[@]}"

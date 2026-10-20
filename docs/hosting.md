@@ -149,7 +149,7 @@ sudo systemctl enable reel-studio-api reel-studio-web
 sudo ./scripts/deploy.sh
 ```
 
-`deploy.sh` installs dependencies, applies database migrations, fetches the MediaPipe models the first time, builds with `PUBLIC_URL` baked into the web app, then starts both services. It waits until both answer on loopback.
+`deploy.sh` installs dependencies, fetches the MediaPipe models the first time, builds with `PUBLIC_URL` baked into the web app, stops the API for the few seconds the database migrations take (SQLite has a single writer), then starts both services. It waits until both answer on loopback.
 
 ## 8. nginx
 
@@ -236,7 +236,7 @@ For a server set up with the earlier HTTP basic auth (the browser's grey usernam
 After pushing to `main`:
 
 ```bash
-sudo /srv/reel-studio/scripts/deploy.sh             # pull, install, migrate, build, restart
+sudo /srv/reel-studio/scripts/deploy.sh             # pull, install, build, migrate, restart
 sudo /srv/reel-studio/scripts/deploy.sh --rollback  # back to the previous commit
 ```
 
