@@ -69,11 +69,6 @@ export class InstagramController {
     return this.instagram.refreshNow();
   }
 
-  @Get('instagram/media')
-  media() {
-    return this.instagram.recentMedia();
-  }
-
   @Post('instagram/poll')
   poll() {
     return this.autoReply.poll(true);
@@ -84,27 +79,23 @@ export class InstagramController {
     return this.instagram.activity(limit ? Number(limit) || 100 : 100);
   }
 
-  // ---------- Rules ----------
+  // ---------- Reels and their DMs ----------
 
-  @Get('instagram/rules')
-  rules() {
-    return this.instagram.rules();
+  @Get('instagram/reels')
+  reels() {
+    return this.instagram.reels();
   }
 
-  @Post('instagram/rules')
-  createRule(@Body() body: unknown) {
-    return this.instagram.createRule(body);
-  }
-
-  @Patch('instagram/rules/:id')
-  updateRule(@Param('id') id: string, @Body() body: unknown) {
-    return this.instagram.updateRule(id, body);
-  }
-
-  @Delete('instagram/rules/:id')
+  @Put('instagram/reels/:mediaId/dm')
   @HttpCode(204)
-  deleteRule(@Param('id') id: string) {
-    return this.instagram.deleteRule(id);
+  setDm(@Param('mediaId') mediaId: string, @Body() body: unknown) {
+    return this.instagram.setReelDm(mediaId, body);
+  }
+
+  @Delete('instagram/reels/:mediaId/dm')
+  @HttpCode(204)
+  clearDm(@Param('mediaId') mediaId: string) {
+    return this.instagram.clearReelDm(mediaId);
   }
 
   // ---------- Publishing ----------
@@ -138,7 +129,7 @@ export class InstagramController {
     if (!req.rawBody || !verifySignature(req.rawBody, signature, this.config.instagram.appSecret)) {
       throw new ForbiddenException('Bad signature');
     }
-    // Answer Meta straight away; replies go out in the background.
+    // Answer Meta straight away; DMs go out in the background.
     void this.autoReply.handleWebhook(body).catch((error: unknown) => this.logger.warn(error instanceof Error ? error.message : String(error)));
     return { ok: true };
   }

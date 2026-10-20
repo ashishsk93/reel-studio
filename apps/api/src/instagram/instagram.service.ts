@@ -1,13 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type {
-  InstagramAccountUpdate,
-  InstagramMediaDto,
-  InstagramReplyDto,
-  InstagramRuleDto,
-  InstagramStatusDto,
-} from '@reel/shared';
-import { InstagramRuleSchema } from '@reel/shared';
-import type { InstagramAccount, InstagramRule } from '../generated/prisma/client';
+import type { InstagramAccountUpdate, InstagramReelDto, InstagramReplyDto, InstagramStatusDto } from '@reel/shared';
+import { InstagramReelDmSchema } from '@reel/shared';
+import type { InstagramAccount } from '../generated/prisma/client';
 import { parseOrThrow } from '../common/zod';
 import { APP_CONFIG, type AppConfig } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const REFRESH_WITHIN_DAYS = 20;
 const REFRESH_CHECK_MS = 6 * 60 * 60 * 1000;
 
-/** The connected account, its token, and the keyword rules. */
+/** The connected account, its token, the shared reply settings and each Reel's DM. */
 @Injectable()
 export class InstagramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('Instagram');
@@ -66,6 +60,8 @@ export class InstagramService implements OnModuleInit, OnModuleDestroy {
       tokenExpiresAt: a.tokenExpiresAt?.toISOString() ?? null,
       autoReply: a.autoReply,
       poll: a.poll,
+      keyword: a.keyword,
+      commentReply: a.commentReply,
       lastWebhookAt: a.lastWebhookAt?.toISOString() ?? null,
       lastPollAt: a.lastPollAt?.toISOString() ?? null,
       lastError: a.lastError,
@@ -104,7 +100,7 @@ export class InstagramService implements OnModuleInit, OnModuleDestroy {
     }
     let lastError: string | null = null;
     try {
-      await client.subscribe(['comments', 'messages']);
+      await client.subscribe(['comments']);
     } catch (error) {
       lastError = `Webhook subscription failed (polling still works): ${error instanceof Error ? error.message : String(error)}`;
     }
@@ -164,90 +160,65 @@ export class InstagramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async recentMedia(): Promise<InstagramMediaDto[]> {
+  /** Your latest Reels with the DM each one sends. */
+  async reels(): Promise<InstagramReelDto[]> {
     const { client } = await this.client();
-    const media = await client.recentMedia(24);
-    return media.map((m) => ({
-      id: m.id,
-      caption: m.caption ?? null,
-      permalink: m.permalink ?? null,
-      thumbnailUrl: m.thumbnail_url ?? (m.media_type === 'IMAGE' ? (m.media_url ?? null) : null),
-      timestamp: m.timestamp,
-    }));
-  }
-
-  // ---------- Rules ----------
-
-  async rules(): Promise<InstagramRuleDto[]> {
-    const rules = await this.prisma.instagramRule.findMany({ orderBy: { createdAt: 'desc' } });
-    return this.ruleDtos(rules);
-  }
-
-  async createRule(body: unknown, extra: { projectId?: string | null } = {}): Promise<InstagramRuleDto> {
-    const input = parseOrThrow(InstagramRuleSchema, body);
-    const rule = await this.prisma.instagramRule.create({
-      data: { ...input, matchDms: input.mediaId ? false : input.matchDms, projectId: extra.projectId ?? null },
-    });
-    return (await this.ruleDtos([rule]))[0]!;
-  }
-
-  async updateRule(id: string, body: unknown): Promise<InstagramRuleDto> {
-    const existing = await this.prisma.instagramRule.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Rule not found');
-    const input = parseOrThrow(InstagramRuleSchema, { ...existing, ...(body as object) });
-    const rule = await this.prisma.instagramRule.update({
-      where: { id },
-      data: {
-        keyword: input.keyword,
-        dmText: input.dmText,
-        commentReply: input.commentReply,
-        mediaId: input.mediaId,
-        matchDms: input.mediaId ? false : input.matchDms,
-        enabled: input.enabled,
-      },
-    });
-    return (await this.ruleDtos([rule]))[0]!;
-  }
-
-  async deleteRule(id: string): Promise<void> {
-    await this.prisma.instagramRule.deleteMany({ where: { id } });
-  }
-
-  private async ruleDtos(rules: InstagramRule[]): Promise<InstagramRuleDto[]> {
-    const mediaIds = rules.map((r) => r.mediaId).filter((m): m is string => Boolean(m));
-    const projectIds = rules.map((r) => r.projectId).filter((p): p is string => Boolean(p));
-    const [posts, projects] = await Promise.all([
-      this.prisma.instagramPost.findMany({ where: { mediaId: { in: mediaIds } } }),
-      this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, title: true } }),
+    const media = (await client.recentMedia(50)).filter((m) => m.media_product_type === 'REELS' || m.media_type === 'VIDEO');
+    const ids = media.map((m) => m.id);
+    const [rules, posts, counts] = await Promise.all([
+      this.prisma.instagramRule.findMany({ where: { mediaId: { in: ids } } }),
+      this.prisma.instagramPost.findMany({ where: { mediaId: { in: ids } }, select: { mediaId: true, projectId: true } }),
+      this.prisma.instagramReply.groupBy({ by: ['mediaId'], where: { mediaId: { in: ids }, status: 'sent' }, _count: { _all: true } }),
     ]);
-    const permalink = new Map(posts.map((p) => [p.mediaId, p.permalink]));
+    const rule = new Map(rules.map((r) => [r.mediaId, r]));
+    const projectOf = new Map<string, string>();
+    for (const r of rules) if (r.projectId) projectOf.set(r.mediaId, r.projectId);
+    for (const p of posts) if (p.mediaId) projectOf.set(p.mediaId, p.projectId);
+    const projects = await this.prisma.project.findMany({ where: { id: { in: [...new Set(projectOf.values())] } }, select: { id: true, title: true } });
     const title = new Map(projects.map((p) => [p.id, p.title]));
-    return rules.map((r) => ({
-      id: r.id,
-      keyword: r.keyword,
-      dmText: r.dmText,
-      commentReply: r.commentReply,
-      mediaId: r.mediaId,
-      matchDms: r.matchDms,
-      enabled: r.enabled,
-      projectId: r.projectId,
-      projectTitle: r.projectId ? (title.get(r.projectId) ?? null) : null,
-      permalink: r.mediaId ? (permalink.get(r.mediaId) ?? null) : null,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    const sent = new Map(counts.map((c) => [c.mediaId, c._count._all]));
+    return media.map((m) => {
+      const r = rule.get(m.id);
+      const projectId = projectOf.get(m.id) ?? null;
+      return {
+        mediaId: m.id,
+        caption: m.caption ?? null,
+        permalink: m.permalink ?? null,
+        thumbnailUrl: m.thumbnail_url ?? null,
+        timestamp: m.timestamp,
+        dmText: r?.dmText ?? null,
+        enabled: r?.enabled ?? false,
+        projectId,
+        projectTitle: projectId ? (title.get(projectId) ?? null) : null,
+        sent: sent.get(m.id) ?? 0,
+      };
+    });
+  }
+
+  /** Sets (or replaces) the DM for one Reel. */
+  async setReelDm(mediaId: string, body: unknown, projectId: string | null = null): Promise<void> {
+    const input = parseOrThrow(InstagramReelDmSchema, body);
+    await this.prisma.instagramRule.upsert({
+      where: { mediaId },
+      create: { mediaId, dmText: input.dmText, enabled: input.enabled, projectId },
+      update: { dmText: input.dmText, enabled: input.enabled, ...(projectId ? { projectId } : {}) },
+    });
+  }
+
+  async clearReelDm(mediaId: string): Promise<void> {
+    await this.prisma.instagramRule.deleteMany({ where: { mediaId } });
   }
 
   async activity(limit = 100): Promise<InstagramReplyDto[]> {
     const rows = await this.prisma.instagramReply.findMany({ orderBy: { createdAt: 'desc' }, take: Math.min(limit, 500) });
-    const rules = await this.prisma.instagramRule.findMany({ where: { id: { in: rows.map((r) => r.ruleId).filter((x): x is string => Boolean(x)) } } });
-    const keyword = new Map(rules.map((r) => [r.id, r.keyword]));
+    const posts = await this.prisma.instagramPost.findMany({ where: { mediaId: { in: rows.map((r) => r.mediaId).filter((x): x is string => Boolean(x)) } } });
+    const permalink = new Map(posts.map((p) => [p.mediaId, p.permalink]));
     return rows.map((r) => ({
       id: r.id,
-      kind: r.kind as InstagramReplyDto['kind'],
       mediaId: r.mediaId,
+      permalink: r.mediaId ? (permalink.get(r.mediaId) ?? null) : null,
       fromUsername: r.fromUsername,
       text: r.text,
-      keyword: r.ruleId ? (keyword.get(r.ruleId) ?? null) : null,
       status: r.status as InstagramReplyDto['status'],
       detail: r.detail,
       createdAt: r.createdAt.toISOString(),

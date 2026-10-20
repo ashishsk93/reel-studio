@@ -34,6 +34,7 @@ export interface GraphMedia {
   thumbnail_url?: string;
   media_url?: string;
   media_type?: string;
+  media_product_type?: string;
   timestamp: string;
 }
 
@@ -69,7 +70,7 @@ export class GraphClient {
 
   async recentMedia(limit = 12): Promise<GraphMedia[]> {
     const res = await this.get<{ data: GraphMedia[] }>('/me/media', {
-      fields: 'id,caption,permalink,thumbnail_url,media_url,media_type,timestamp',
+      fields: 'id,caption,permalink,thumbnail_url,media_url,media_type,media_product_type,timestamp',
       limit: String(limit),
     });
     return res.data;
@@ -87,11 +88,6 @@ export class GraphClient {
   /** One DM to the commenter, allowed once per comment within 7 days of it. */
   privateReply(commentId: string, text: string): Promise<{ message_id?: string }> {
     return this.post('/me/messages', { recipient: { comment_id: commentId }, message: { text } });
-  }
-
-  /** DM inside the 24-hour window after the person messaged the account. */
-  sendMessage(recipientId: string, text: string): Promise<{ message_id?: string }> {
-    return this.post('/me/messages', { recipient: { id: recipientId }, message: { text } });
   }
 
   replyToComment(commentId: string, text: string): Promise<{ id: string }> {

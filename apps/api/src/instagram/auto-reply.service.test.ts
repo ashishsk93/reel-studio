@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AutoReplyService } from './auto-reply.service';
 import type { GraphClient } from './graph';
 import { InstagramService } from './instagram.service';
-import type { IgEvent } from './webhook';
+import type { IgComment } from './webhook';
 
 /** Runs the auto-replier against a throwaway SQLite database and a fake Graph client. */
 describe('AutoReplyService', () => {
@@ -26,7 +26,6 @@ describe('AutoReplyService', () => {
       sent.push({ to: commentId, text, via: 'private' });
       return {};
     },
-    sendMessage: async (id: string, text: string) => (sent.push({ to: id, text, via: 'dm' }), {}),
     replyToComment: async (id: string, text: string) => (sent.push({ to: id, text, via: 'public' }), { id: 'r' }),
   } as unknown as GraphClient;
 
@@ -58,19 +57,16 @@ describe('AutoReplyService', () => {
     await prisma.instagramRule.deleteMany();
     await prisma.instagramAccount.upsert({
       where: { id: 'me' },
-      create: { id: 'me', igUserId: 'own', username: 'slay', accessToken: 'T', autoReply: true },
-      update: { accessToken: 'T', autoReply: true },
+      create: { id: 'me', igUserId: 'own', username: 'slay', accessToken: 'T', autoReply: true, keyword: 'LINK', commentReply: 'Check your DMs' },
+      update: { accessToken: 'T', autoReply: true, keyword: 'LINK', commentReply: 'Check your DMs' },
     });
-    await prisma.instagramRule.create({
-      data: { keyword: 'LINK', dmText: 'Here it is', commentReply: 'Check your DMs', mediaId: 'm1', createdAt: new Date(Date.now() - 3600_000) },
-    });
+    await prisma.instagramRule.create({ data: { dmText: 'Here it is', mediaId: 'm1' } });
   });
 
-  const comment = (id: string, from = 'u1', text = 'link pls'): IgEvent => ({
-    kind: 'comment',
+  const comment = (id: string, from = 'u1', text = 'link pls', mediaId = 'm1'): IgComment => ({
     id,
     text,
-    mediaId: 'm1',
+    mediaId,
     fromId: from,
     fromUsername: from,
     createdAt: new Date(),
@@ -109,10 +105,16 @@ describe('AutoReplyService', () => {
     expect(await service.handle(comment('c1'))).toBeNull();
   });
 
-  it('answers keyword DMs with every-post rules that opted in', async () => {
-    await prisma.instagramRule.create({ data: { keyword: 'price', dmText: 'It is ₹499', matchDms: true, createdAt: new Date(Date.now() - 3600_000) } });
-    const dm: IgEvent = { kind: 'dm', id: 'mid1', text: 'PRICE?', fromId: 'u9', fromUsername: null, createdAt: new Date() };
-    expect(await service.handle(dm)).toBe('sent');
-    expect(sent).toEqual([{ to: 'u9', text: 'It is ₹499', via: 'dm' }]);
+  it('only answers Reels that have a DM, each with its own text', async () => {
+    expect(await service.handle(comment('c1', 'u1', 'link', 'm2'))).toBeNull();
+    await prisma.instagramRule.create({ data: { dmText: 'Other Reel link', mediaId: 'm2' } });
+    expect(await service.handle(comment('c2', 'u1', 'link', 'm2'))).toBe('sent');
+    expect(sent[0]).toEqual({ to: 'c2', text: 'Other Reel link', via: 'private' });
+  });
+
+  it('uses the shared keyword', async () => {
+    await prisma.instagramAccount.update({ where: { id: 'me' }, data: { keyword: 'SHOP' } });
+    expect(await service.handle(comment('c1', 'u1', 'link'))).toBeNull();
+    expect(await service.handle(comment('c2', 'u1', 'shop pls'))).toBe('sent');
   });
 });

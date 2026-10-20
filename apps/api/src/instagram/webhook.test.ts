@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { keywordFromCta, matchesKeyword, mediaSignature, parseWebhook, verifyMediaSignature, verifySignature } from './webhook';
+import { matchesKeyword, mediaSignature, parseWebhook, verifyMediaSignature, verifySignature } from './webhook';
 
 describe('matchesKeyword', () => {
   it('matches whole words, any case, with emoji and punctuation around', () => {
@@ -22,14 +22,6 @@ describe('matchesKeyword', () => {
   });
 });
 
-describe('keywordFromCta', () => {
-  it('reads the keyword after "Comment"', () => {
-    expect(keywordFromCta("Comment LINK and I'll DM you the link 👇")).toBe('LINK');
-    expect(keywordFromCta('comment “SAREE” for details')).toBe('SAREE');
-    expect(keywordFromCta('Shop now')).toBeNull();
-  });
-});
-
 describe('verifySignature', () => {
   const body = Buffer.from('{"object":"instagram"}');
   const sig = `sha256=${createHmac('sha256', 'secret').update(body).digest('hex')}`;
@@ -47,7 +39,7 @@ describe('verifySignature', () => {
 describe('parseWebhook', () => {
   const own = new Set(['17841400000000000']);
 
-  it('reads comments and DMs and drops echoes and our own comments', () => {
+  it('reads comments and drops our own', () => {
     const events = parseWebhook(
       {
         object: 'instagram',
@@ -60,18 +52,13 @@ describe('parseWebhook', () => {
               { field: 'comments', value: { id: 'c2', text: 'thanks!', media: { id: 'm1' }, from: { id: '17841400000000000', username: 'me' } } },
               { field: 'mentions', value: { id: 'x' } },
             ],
-            messaging: [
-              { sender: { id: 'u2' }, recipient: { id: '17841400000000000' }, timestamp: 1_760_000_000_000, message: { mid: 'mid1', text: 'link?' } },
-              { sender: { id: '17841400000000000' }, recipient: { id: 'u2' }, timestamp: 1, message: { mid: 'mid2', text: 'hi', is_echo: true } },
-            ],
           },
         ],
       },
       own,
     );
     expect(events).toEqual([
-      { kind: 'comment', id: 'c1', text: 'LINK', mediaId: 'm1', fromId: 'u1', fromUsername: 'riya', createdAt: new Date(1_760_000_000_000) },
-      { kind: 'dm', id: 'mid1', text: 'link?', fromId: 'u2', fromUsername: null, createdAt: new Date(1_760_000_000_000) },
+      { id: 'c1', text: 'LINK', mediaId: 'm1', fromId: 'u1', fromUsername: 'riya', createdAt: new Date(1_760_000_000_000) },
     ]);
   });
 

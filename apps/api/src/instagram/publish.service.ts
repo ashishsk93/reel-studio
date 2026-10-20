@@ -5,10 +5,9 @@ import type { InstagramPost } from '../generated/prisma/client';
 import { parseOrThrow } from '../common/zod';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import { InstagramService } from './instagram.service';
-import { keywordFromCta, mediaSignature } from './webhook';
+import { mediaSignature } from './webhook';
 
 export const PUBLISH_JOB = 'instagram.publish';
 /** Files Instagram may fetch through a signed link. */
@@ -17,7 +16,7 @@ export const PUBLIC_RENDER_FILES = ['final.mp4', 'cover_titled.jpg', 'cover.jpg'
 const PublishPayload = z.object({
   postId: z.string(),
   shareToFeed: z.boolean(),
-  autoReply: z.object({ keyword: z.string(), dmText: z.string(), commentReply: z.string().nullable() }).nullable(),
+  dmText: z.string().nullable(),
 });
 
 const LINK_TTL_S = 3 * 60 * 60;
@@ -33,7 +32,7 @@ const sleep = (ms: number, signal: AbortSignal) =>
 /**
  * Publishes a render as a Reel: Instagram fetches final.mp4 (and the cover) from a signed,
  * short-lived PUBLIC_URL link, processes it, then we publish, add the first comment and
- * switch on the keyword auto-reply for that Reel.
+ * set the Reel's DM.
  */
 @Injectable()
 export class PublishService implements OnModuleInit {
@@ -43,7 +42,6 @@ export class PublishService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly jobs: JobsService,
     private readonly storage: StorageService,
-    private readonly settings: SettingsService,
     private readonly instagram: InstagramService,
   ) {}
 
@@ -68,10 +66,10 @@ export class PublishService implements OnModuleInit {
 
   /** Defaults for the publish form and earlier attempts for this project. */
   async forProject(projectId: string): Promise<InstagramProjectDto> {
-    const [posts, captions, cta] = await Promise.all([
+    const [posts, captions, products] = await Promise.all([
       this.prisma.instagramPost.findMany({ where: { projectId }, orderBy: { createdAt: 'desc' } }),
       this.prisma.captionPackage.findUnique({ where: { projectId } }),
-      this.settings.get('compose.cta'),
+      this.prisma.product.findMany({ where: { projectId }, select: { source: { select: { key: true } } } }),
     ]);
     const status = await this.instagram.status();
     return {
@@ -80,9 +78,10 @@ export class PublishService implements OnModuleInit {
       defaults: {
         caption: captions?.caption ?? '',
         firstComment: captions?.firstComment ?? null,
-        keyword: keywordFromCta(cta.text) ?? 'LINK',
         dmText: captions?.dmTemplate ?? '',
+        keyword: status.keyword,
       },
+      otherAppReplies: products.some((p) => p.source.key === 'meesho'),
     };
   }
 
@@ -104,7 +103,7 @@ export class PublishService implements OnModuleInit {
     const post = await this.prisma.instagramPost.create({
       data: { projectId, renderId: render.id, status: 'queued', caption: input.caption, firstComment: input.firstComment },
     });
-    return this.jobs.enqueue(PUBLISH_JOB, { postId: post.id, shareToFeed: input.shareToFeed, autoReply: input.autoReply }, { projectId, idempotencyKey: `${PUBLISH_JOB}:${post.id}` });
+    return this.jobs.enqueue(PUBLISH_JOB, { postId: post.id, shareToFeed: input.shareToFeed, dmText: input.dmText }, { projectId, idempotencyKey: `${PUBLISH_JOB}:${post.id}` });
   }
 
   /** Public, time-limited URL Instagram can download a render file from. */
@@ -168,9 +167,7 @@ export class PublishService implements OnModuleInit {
       await progress(0.92, 'Adding the first comment');
       await client.comment(published.id, post.firstComment).catch((e: unknown) => warnings.push(`First comment failed: ${e instanceof Error ? e.message : String(e)}`));
     }
-    if (payload.autoReply) {
-      await this.instagram.createRule({ ...payload.autoReply, mediaId: published.id, matchDms: false, enabled: true }, { projectId: post.projectId });
-    }
+    if (payload.dmText) await this.instagram.setReelDm(published.id, { dmText: payload.dmText }, post.projectId);
     if (warnings.length) await this.prisma.instagramPost.update({ where: { id: post.id }, data: { error: warnings.join(' · ') } });
     this.logger.log(`Published ${post.permalink ?? published.id}`);
     return { postId: post.id, permalink: post.permalink };

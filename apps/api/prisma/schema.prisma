@@ -451,6 +451,9 @@ model InstagramAccount {
   tokenExpiresAt DateTime?
   /// Master switch for keyword auto-replies.
   autoReply      Boolean   @default(true)
+  /// Shared by every Reel: the word commenters type, and an optional public reply under their comment.
+  keyword        String    @default("LINK")
+  commentReply   String?
   /// Poll recent posts for comments (works without webhooks, e.g. while the Meta app is in Development mode).
   poll           Boolean   @default(true)
   lastWebhookAt  DateTime?
@@ -459,23 +462,16 @@ model InstagramAccount {
   updatedAt      DateTime  @updatedAt
 }
 
-/// "Comment LINK and I'll DM you": a keyword and what to send back.
+/// The DM a Reel's commenters get when they comment the keyword. One per Reel, since each
+/// Reel has its own links. Reels without one (e.g. Meesho, whose app replies) are left alone.
 model InstagramRule {
-  id           String   @id @default(cuid())
-  keyword      String
-  dmText       String
-  /// Optional public reply under the comment.
-  commentReply String?
-  /// null: every post. Otherwise only comments on this media id.
-  mediaId      String?
-  /// Also answer DMs that contain the keyword (only for rules on every post).
-  matchDms     Boolean  @default(false)
-  enabled      Boolean  @default(true)
-  projectId    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([mediaId])
+  id        String   @id @default(cuid())
+  mediaId   String   @unique
+  dmText    String
+  enabled   Boolean  @default(true)
+  projectId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// A Reel published from the app.

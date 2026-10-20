@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import type { InstagramProjectDto, JobDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +17,7 @@ import { useJobRefresh, useJobWatcher, useProjectJobs } from "@/lib/jobs";
 import { useSyncedState } from "@/lib/hooks";
 import { instagramKeys, projectKeys, useProjectInstagram } from "@/lib/queries";
 
-/** Export step: publish the latest render to Instagram and switch on the keyword DM for it. */
+/** Export step: publish the latest render to Instagram and set its DM (unless another app, e.g. Meesho's, replies). */
 export function PublishCard({ projectId, renderId }: { projectId: string; renderId: string }) {
   const { data } = useProjectInstagram(projectId);
   if (!data) return null;
@@ -36,8 +35,7 @@ function PublishForm({ projectId, renderId, data }: { projectId: string; renderI
     caption: data.defaults.caption,
     firstComment: data.defaults.firstComment ?? "",
     shareToFeed: true,
-    autoReply: true,
-    keyword: data.defaults.keyword,
+    autoReply: !data.otherAppReplies,
     dmText: data.defaults.dmText,
   }));
   const [open, setOpen] = useState(false);
@@ -49,7 +47,7 @@ function PublishForm({ projectId, renderId, data }: { projectId: string; renderI
         caption: form.caption,
         firstComment: form.firstComment.trim() || null,
         shareToFeed: form.shareToFeed,
-        autoReply: form.autoReply ? { keyword: form.keyword, dmText: form.dmText, commentReply: null } : null,
+        dmText: form.autoReply ? form.dmText : null,
       });
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: instagramKeys.project(projectId) });
@@ -119,25 +117,25 @@ function PublishForm({ projectId, renderId, data }: { projectId: string; renderI
             <Switch checked={form.shareToFeed} onCheckedChange={(v) => setForm({ ...form, shareToFeed: v })} /> Also show on the profile grid
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <Switch checked={form.autoReply} onCheckedChange={(v) => setForm({ ...form, autoReply: v })} /> DM people who comment the keyword
+            <Switch checked={form.autoReply} onCheckedChange={(v) => setForm({ ...form, autoReply: v })} /> DM people who comment{" "}
+            <span className="font-mono">{data.defaults.keyword}</span>
           </label>
+          {data.otherAppReplies && !form.autoReply && (
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Off for Meesho: its app replies once you generate the link. You can still set a DM later on the Instagram page.
+            </p>
+          )}
           {form.autoReply && (
-            <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-[140px_1fr]">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ig-kw">Keyword</Label>
-                <Input id="ig-kw" value={form.keyword} onChange={(e) => setForm({ ...form, keyword: e.target.value })} className="font-mono" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="ig-dm">DM</Label>
-                <Textarea id="ig-dm" rows={4} value={form.dmText} onChange={(e) => setForm({ ...form, dmText: e.target.value })} />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ig-dm">DM for this Reel</Label>
+              <Textarea id="ig-dm" rows={4} value={form.dmText} onChange={(e) => setForm({ ...form, dmText: e.target.value })} />
             </div>
           )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={publish.isPending || !form.caption.trim() || (form.autoReply && (!form.keyword.trim() || !form.dmText.trim()))}>
+            <Button type="submit" disabled={publish.isPending || !form.caption.trim() || (form.autoReply && !form.dmText.trim())}>
               {publish.isPending ? <Loader2 className="animate-spin" /> : <Send />} Publish now
             </Button>
           </div>

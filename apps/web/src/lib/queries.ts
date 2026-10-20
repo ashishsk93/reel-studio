@@ -150,7 +150,7 @@ export const instagramKeys = {
   status: ["instagram", "status"] as const,
   rules: ["instagram", "rules"] as const,
   activity: ["instagram", "activity"] as const,
-  media: ["instagram", "media"] as const,
+  reels: ["instagram", "reels"] as const,
   project: (id: string) => ["instagram", "project", id] as const,
 };
 

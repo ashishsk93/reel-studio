@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, MessageCircleReply, Pencil, Plus, RefreshCw, Trash2, Unplug } from "lucide-react";
+import { ExternalLink, Film, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { toast } from "sonner";
-import type { InstagramMediaDto, InstagramReplyDto, InstagramRuleDto, InstagramRuleInput, InstagramStatusDto } from "@reel/shared";
+import type { InstagramReelDto, InstagramReplyDto, InstagramStatusDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CopyButton } from "@/components/copy-button";
 import { EmptyState, ErrorState, FieldError, PageHeader } from "@/components/page-header";
 import { ApiError, api, errorMessage } from "@/lib/api";
+import { useSyncedState } from "@/lib/hooks";
 import { instagramKeys, useInstagramStatus } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ export default function InstagramPage() {
     <>
       <PageHeader
         title="Instagram"
-        description="Your own account: publish Reels from the Export step, and DM people who comment your keyword."
+        description="Your own account: publish Reels from the Export step, and DM each Reel's link to people who comment the keyword."
       />
       {error && <ErrorState error={error} />}
       {isPending || !status ? (
@@ -37,7 +38,8 @@ export default function InstagramPage() {
           <AccountCard status={status} />
           {status.connected && (
             <>
-              <RulesCard />
+              <ReplySettingsCard status={status} />
+              <ReelsCard keyword={status.keyword} />
               <ActivityCard />
             </>
           )}
@@ -140,7 +142,7 @@ function AccountCard({ status }: { status: InstagramStatusDto }) {
           <Switch checked={status.autoReply} onCheckedChange={(v) => update.mutate({ autoReply: v })} />
           <span>
             Auto-reply on
-            <span className="block text-xs text-muted-foreground">Master switch for every keyword rule below.</span>
+            <span className="block text-xs text-muted-foreground">Master switch for every Reel&apos;s DM.</span>
           </span>
         </label>
         <label className="flex items-center gap-3">
@@ -167,142 +169,141 @@ function AccountCard({ status }: { status: InstagramStatusDto }) {
   );
 }
 
-const EMPTY_RULE: InstagramRuleInput = { keyword: "LINK", dmText: "", commentReply: null, mediaId: null, matchDms: false, enabled: true };
-
-function RulesCard() {
+function ReplySettingsCard({ status }: { status: InstagramStatusDto }) {
   const queryClient = useQueryClient();
-  const rules = useQuery({ queryKey: instagramKeys.rules, queryFn: () => api.get<InstagramRuleDto[]>("/instagram/rules") });
-  const [editing, setEditing] = useState<{ id: string | null; value: InstagramRuleInput } | null>(null);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: instagramKeys.rules });
-  const toggle = useMutation({
-    mutationFn: (r: InstagramRuleDto) => api.patch(`/instagram/rules/${r.id}`, { enabled: !r.enabled }),
-    onSuccess: invalidate,
+  const [form, setForm] = useSyncedState(`${status.keyword}|${status.commentReply ?? ""}`, () => ({
+    keyword: status.keyword,
+    commentReply: status.commentReply ?? "",
+  }));
+  const save = useMutation({
+    mutationFn: () => api.patch<InstagramStatusDto>("/instagram", { keyword: form.keyword, commentReply: form.commentReply.trim() || null }),
+    onSuccess: (s) => {
+      queryClient.setQueryData(instagramKeys.status, s);
+      toast.success("Saved");
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const remove = useMutation({ mutationFn: (id: string) => api.del(`/instagram/rules/${id}`), onSuccess: invalidate, onError: (e) => toast.error(errorMessage(e)) });
+  const errors = save.error instanceof ApiError ? save.error.fieldErrors() : {};
+  const dirty = form.keyword !== status.keyword || (form.commentReply.trim() || null) !== status.commentReply;
 
   return (
+    <Card title="Reply settings" description="Shared by every Reel. Only the DM text is set per Reel, below.">
+      <form
+        className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="kw">Keyword</Label>
+          <Input id="kw" value={form.keyword} onChange={(e) => setForm({ ...form, keyword: e.target.value })} className="font-mono" />
+          <FieldError message={errors.keyword} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pub">Public reply under the comment (optional)</Label>
+          <Input id="pub" value={form.commentReply} onChange={(e) => setForm({ ...form, commentReply: e.target.value })} placeholder="Sent you a DM 💌" />
+          <FieldError message={errors.commentReply} />
+        </div>
+        <Button type="submit" disabled={!dirty || save.isPending}>
+          {save.isPending && <Loader2 className="animate-spin" />} Save
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function ReelsCard({ keyword }: { keyword: string }) {
+  const reels = useQuery({ queryKey: instagramKeys.reels, queryFn: () => api.get<InstagramReelDto[]>("/instagram/reels") });
+  return (
     <Card
-      title="Keyword replies"
-      description="When someone comments the keyword, they get your DM once (Instagram allows one private reply per comment, within 7 days). Comments from before a rule existed are left alone."
+      title="Your Reels"
+      description={`Give a Reel a DM and people who comment ${keyword} get it once (Instagram allows one private reply per comment, within 7 days). Reels without a DM are left alone, e.g. Meesho, whose app replies itself.`}
       actions={
-        <Button size="sm" onClick={() => setEditing({ id: null, value: EMPTY_RULE })}>
-          <Plus /> New rule
+        <Button size="sm" variant="outline" onClick={() => void reels.refetch()} disabled={reels.isFetching}>
+          <RefreshCw className={cn(reels.isFetching && "animate-spin")} /> Reload
         </Button>
       }
     >
-      {editing && <RuleForm initial={editing} onDone={() => (setEditing(null), void invalidate())} />}
-      {rules.error && <ErrorState error={rules.error} />}
-      {rules.data?.length === 0 && !editing && (
-        <EmptyState icon={<MessageCircleReply className="size-8" />} title="No rules yet">
-          Publishing a Reel from the Export step adds one for that Reel automatically.
+      {reels.error && <ErrorState error={reels.error} />}
+      {reels.isPending && <Skeleton className="h-40" />}
+      {reels.data?.length === 0 && (
+        <EmptyState icon={<Film className="size-8" />} title="No Reels yet">
+          Reels you post show up here.
         </EmptyState>
       )}
       <ul className="flex flex-col divide-y">
-        {rules.data?.map((r) => (
-          <li key={r.id} className="flex flex-wrap items-start gap-3 py-3">
-            <Switch checked={r.enabled} onCheckedChange={() => toggle.mutate(r)} className="mt-1" />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge className="font-mono">{r.keyword}</Badge>
-                <span className="text-muted-foreground">
-                  {r.mediaId ? (
-                    r.permalink ? (
-                      <a href={r.permalink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                        {r.projectTitle ?? "One Reel"} <ExternalLink className="size-3" />
-                      </a>
-                    ) : (
-                      (r.projectTitle ?? `Post ${r.mediaId}`)
-                    )
-                  ) : (
-                    "Every post"
-                  )}
-                </span>
-                {r.matchDms && <Badge variant="outline">also DMs</Badge>}
-                {r.commentReply && <Badge variant="outline">public reply</Badge>}
-              </div>
-              <p className="mt-1 line-clamp-2 text-xs whitespace-pre-line text-muted-foreground">{r.dmText}</p>
-            </div>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Edit rule"
-              onClick={() => setEditing({ id: r.id, value: { keyword: r.keyword, dmText: r.dmText, commentReply: r.commentReply, mediaId: r.mediaId, matchDms: r.matchDms, enabled: r.enabled } })}
-            >
-              <Pencil />
-            </Button>
-            <Button size="icon-sm" variant="ghost" aria-label="Delete rule" onClick={() => remove.mutate(r.id)}>
-              <Trash2 />
-            </Button>
-          </li>
+        {reels.data?.map((r) => (
+          <ReelRow key={r.mediaId} reel={r} />
         ))}
       </ul>
     </Card>
   );
 }
 
-function RuleForm({ initial, onDone }: { initial: { id: string | null; value: InstagramRuleInput }; onDone: () => void }) {
-  const [v, setV] = useState(initial.value);
-  const media = useQuery({ queryKey: instagramKeys.media, queryFn: () => api.get<InstagramMediaDto[]>("/instagram/media") });
+function ReelRow({ reel }: { reel: InstagramReelDto }) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useSyncedState(reel.dmText, () => reel.dmText ?? "");
+  const refresh = () => queryClient.invalidateQueries({ queryKey: instagramKeys.reels });
   const save = useMutation({
-    mutationFn: () => (initial.id ? api.patch(`/instagram/rules/${initial.id}`, v) : api.post("/instagram/rules", v)),
-    onSuccess: () => (toast.success("Rule saved"), onDone()),
+    mutationFn: (enabled: boolean) => api.put(`/instagram/reels/${reel.mediaId}/dm`, { dmText: text, enabled }),
+    onSuccess: () => (toast.success("DM saved"), void refresh()),
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const errors = save.error instanceof ApiError ? save.error.fieldErrors() : {};
+  const clear = useMutation({
+    mutationFn: () => api.del(`/instagram/reels/${reel.mediaId}/dm`),
+    onSuccess: () => void refresh(),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const dirty = text.trim() !== (reel.dmText ?? "");
 
   return (
-    <form
-      className="mb-4 grid gap-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate();
-      }}
-    >
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="kw">Keyword</Label>
-        <Input id="kw" value={v.keyword} onChange={(e) => setV({ ...v, keyword: e.target.value })} className="font-mono" />
-        <FieldError message={errors.keyword} />
+    <li className="flex gap-4 py-4">
+      <a href={reel.permalink ?? undefined} target="_blank" rel="noreferrer" className="shrink-0">
+        {reel.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={reel.thumbnailUrl} alt="" className="aspect-[9/16] w-20 rounded-lg border object-cover" />
+        ) : (
+          <div className="flex aspect-[9/16] w-20 items-center justify-center rounded-lg border bg-muted">
+            <Film className="size-5 text-muted-foreground" />
+          </div>
+        )}
+      </a>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{new Date(reel.timestamp).toLocaleDateString()}</span>
+          {reel.projectTitle && <Badge variant="secondary">{reel.projectTitle}</Badge>}
+          {reel.dmText ? (
+            <Badge variant={reel.enabled ? "default" : "outline"}>{reel.enabled ? "Auto-DM on" : "Paused"}</Badge>
+          ) : (
+            <Badge variant="outline">No auto-DM</Badge>
+          )}
+          {reel.sent > 0 && <span>{reel.sent} sent</span>}
+          {reel.permalink && (
+            <a href={reel.permalink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
+              Open <ExternalLink className="size-3" />
+            </a>
+          )}
+        </div>
+        <p className="line-clamp-1 text-sm">{reel.caption ?? "(no caption)"}</p>
+        <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder="The DM for this Reel, with its link…" />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {reel.dmText && (
+            <>
+              <label className="mr-auto flex items-center gap-2 text-xs">
+                <Switch checked={reel.enabled} disabled={dirty || save.isPending} onCheckedChange={(v) => save.mutate(v)} /> Send it
+              </label>
+              <Button size="sm" variant="ghost" onClick={() => clear.mutate()} disabled={clear.isPending}>
+                Remove DM
+              </Button>
+            </>
+          )}
+          <Button size="sm" onClick={() => save.mutate(reel.dmText ? reel.enabled : true)} disabled={!dirty || !text.trim() || save.isPending}>
+            {save.isPending && <Loader2 className="animate-spin" />} Save DM
+          </Button>
+        </div>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="post">Applies to</Label>
-        <select
-          id="post"
-          value={v.mediaId ?? ""}
-          onChange={(e) => setV({ ...v, mediaId: e.target.value || null })}
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-        >
-          <option value="">Every post</option>
-          {v.mediaId && !media.data?.some((m) => m.id === v.mediaId) && <option value={v.mediaId}>Post {v.mediaId}</option>}
-          {media.data?.map((m) => (
-            <option key={m.id} value={m.id}>
-              {new Date(m.timestamp).toLocaleDateString()} · {(m.caption ?? "(no caption)").slice(0, 60)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
-        <Label htmlFor="dm">DM they get</Label>
-        <Textarea id="dm" rows={4} value={v.dmText} onChange={(e) => setV({ ...v, dmText: e.target.value })} placeholder="Here's the link 💛 https://…" />
-        <FieldError message={errors.dmText} />
-      </div>
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
-        <Label htmlFor="pub">Public reply under the comment (optional)</Label>
-        <Input id="pub" value={v.commentReply ?? ""} onChange={(e) => setV({ ...v, commentReply: e.target.value || null })} placeholder="Sent you a DM 💌" />
-      </div>
-      <label className={cn("flex items-center gap-2 text-sm", v.mediaId && "opacity-50")}>
-        <Switch checked={!v.mediaId && Boolean(v.matchDms)} disabled={Boolean(v.mediaId)} onCheckedChange={(c) => setV({ ...v, matchDms: c })} />
-        Also answer DMs that contain the keyword
-      </label>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending && <Loader2 className="animate-spin" />} Save rule
-        </Button>
-      </div>
-    </form>
+    </li>
   );
 }
 
@@ -319,7 +320,7 @@ function ActivityCard() {
     refetchInterval: 30_000,
   });
   return (
-    <Card title="Recent replies" description="Every comment or DM the auto-replier answered or skipped.">
+    <Card title="Recent replies" description="Every comment the auto-replier answered or skipped.">
       {activity.error && <ErrorState error={activity.error} />}
       {activity.data?.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
       <ul className="flex flex-col gap-2 text-sm">
@@ -327,10 +328,12 @@ function ActivityCard() {
           <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
             <span className={cn("w-14 text-xs font-medium", STATUS_STYLE[r.status])}>{r.status}</span>
             <span className="font-medium">{r.fromUsername ? `@${r.fromUsername}` : "someone"}</span>
-            <span className="text-muted-foreground">
-              {r.kind === "dm" ? "DMed" : "commented"} “{r.text.slice(0, 80)}”
-            </span>
-            {r.keyword && <Badge variant="outline" className="font-mono">{r.keyword}</Badge>}
+            <span className="text-muted-foreground">commented “{r.text.slice(0, 80)}”</span>
+            {r.permalink && (
+              <a href={r.permalink} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                Reel
+              </a>
+            )}
             <span className="ml-auto text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
             {r.detail && <p className="w-full pl-16 text-xs text-muted-foreground">{r.detail}</p>}
           </li>
@@ -355,7 +358,7 @@ function SetupCard({ status }: { status: InstagramStatusDto }) {
       <ul className="flex flex-col gap-2 text-sm">
         {row(status.connected, "Account connected", "Paste a token above.")}
         {row(status.configured, "INSTAGRAM_APP_SECRET set", "From the Meta app: Instagram → API setup → Business login settings. Signs webhooks and video links.")}
-        {row(Boolean(status.publicUrl), `PUBLIC_URL set${status.publicUrl ? ` (${status.publicUrl})` : ""}`, "Publishing and webhooks need the app reachable over HTTPS; until then, keyword replies run by checking comments.")}
+        {row(Boolean(status.publicUrl), `PUBLIC_URL set${status.publicUrl ? ` (${status.publicUrl})` : ""}`, "Publishing and webhooks need the app reachable over HTTPS; until then, DMs go out by checking comments.")}
         {row(status.verifyTokenSet, "INSTAGRAM_WEBHOOK_VERIFY_TOKEN set", "Any random string; paste the same one in the Meta app's webhook settings.")}
       </ul>
       {status.webhookUrl && (
