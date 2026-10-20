@@ -17,9 +17,15 @@ Commands marked **(PC)** run in PowerShell on your computer in `D:\Projects\reel
 
 ---
 
-## 1. DNS (Hostinger)
+## 1. DNS (GoDaddy)
 
-In Hostinger → Domains → velra.tech → DNS, add an **A record**: name `studio`, pointing to the same IP as the `@` record. Wait until it resolves:
+velra.tech's DNS is at GoDaddy (nameservers `ns39/ns40.domaincontrol.com`); the server is at Hostinger. In GoDaddy → My Products → velra.tech → **DNS** → **Add New Record**:
+
+| Type | Name | Value | TTL |
+|---|---|---|---|
+| A | `studio` | the same IP as the `@` record (`72.60.205.125` as of Oct 2026) | 1 hour |
+
+Wait until it resolves:
 
 ```bash
 dig +short studio.velra.tech
