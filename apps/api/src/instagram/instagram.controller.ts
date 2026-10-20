@@ -137,8 +137,12 @@ export class InstagramController {
   @HttpCode(200)
   receive(@Req() req: RawBodyRequest<Request>, @Headers('x-hub-signature-256') signature: string | undefined, @Body() body: unknown) {
     if (!req.rawBody || !verifySignature(req.rawBody, signature, this.config.instagram.appSecret)) {
+      this.logger.warn(`Webhook rejected: bad signature (${signature ? 'wrong secret?' : 'no X-Hub-Signature-256 header'})`);
       throw new ForbiddenException('Bad signature');
     }
+    const entries = (body as { entry?: Array<{ changes?: Array<{ field?: string }> }> })?.entry ?? [];
+    const fields = entries.flatMap((e) => (e.changes ?? []).map((c) => c.field ?? '?'));
+    this.logger.log(`Webhook received: ${fields.length ? fields.join(', ') : 'no changes'}`);
     // Answer Meta straight away; DMs go out in the background.
     void this.autoReply.handleWebhook(body).catch((error: unknown) => this.logger.warn(error instanceof Error ? error.message : String(error)));
     return { ok: true };
