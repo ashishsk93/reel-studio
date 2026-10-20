@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { splitKeywords } from '@reel/shared';
 
 /** A comment from a webhook or the poller, in one shape. */
 export interface IgComment {
@@ -52,13 +53,19 @@ export function parseWebhook(body: unknown, ownIds: ReadonlySet<string>): IgComm
   return comments;
 }
 
-/** Whole-word, case-insensitive: "link" matches "Link pls 😍" and "LINK!" but not "linked". */
-export function matchesKeyword(text: string, keyword: string): boolean {
+/**
+ * Whole-word, case-insensitive: "link" matches "Link pls 😍" and "LINK!" but not "linked".
+ * `keywords` is the stored comma-separated list ("LINK, PRICE"); any one of them matches.
+ */
+export function matchesKeyword(text: string, keywords: string): boolean {
   const norm = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
-  const needle = norm(keyword);
-  if (!needle) return false;
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
-  return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}($|[^\\p{L}\\p{N}_])`, 'u').test(norm(text));
+  const haystack = norm(text);
+  return splitKeywords(keywords).some((keyword) => {
+    const needle = norm(keyword);
+    if (!needle) return false;
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+    return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}($|[^\\p{L}\\p{N}_])`, 'u').test(haystack);
+  });
 }
 
 /** HMAC for a time-limited public link to a render file, so Instagram can fetch final.mp4. */

@@ -3,7 +3,7 @@
 Reel Studio talks to **your own** Instagram account through the *Instagram API with Instagram Login* (`graph.instagram.com`). It can:
 
 - **Publish** a render as a Reel from the Export step: caption, cover, first comment.
-- **Auto-DM per Reel**: each Reel has its own links, so each Reel gets its own DM. When someone comments the keyword on a Reel that has a DM, they get that DM once. The keyword (default `LINK`) and an optional public "Sent you a DM 💌" reply are shared by every Reel.
+- **Auto-DM per Reel**: each Reel has its own links, so each Reel gets its own DM. When someone comments the keyword on a Reel that has a DM, they get that DM once. The keywords (default `LINK`; a comma-separated list such as `LINK, PRICE`, any one of which triggers the DM) and an optional public "Sent you a DM 💌" reply are shared by every Reel.
 
 The **Instagram** page lists your Reels; set, edit, pause or remove each one's DM there. Reels without a DM are left alone. That suits **Meesho** Reels: the affiliate link only exists once the Reel is up, and Meesho's app does the replying.
 

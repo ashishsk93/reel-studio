@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Film, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { toast } from "sonner";
-import type { InstagramReelDto, InstagramReplyDto, InstagramStatusDto } from "@reel/shared";
+import { splitKeywords, type InstagramReelDto, type InstagramReplyDto, type InstagramStatusDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,15 +189,15 @@ function ReplySettingsCard({ status }: { status: InstagramStatusDto }) {
   return (
     <Card title="Reply settings" description="Shared by every Reel. Only the DM text is set per Reel, below.">
       <form
-        className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end"
+        className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           save.mutate();
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="kw">Keyword</Label>
-          <Input id="kw" value={form.keyword} onChange={(e) => setForm({ ...form, keyword: e.target.value })} className="font-mono" />
+          <Label htmlFor="kw">Keywords (comma-separated, any one triggers)</Label>
+          <Input id="kw" value={form.keyword} onChange={(e) => setForm({ ...form, keyword: e.target.value })} placeholder="LINK, PRICE, SHOP" className="font-mono" />
           <FieldError message={errors.keyword} />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -218,7 +218,7 @@ function ReelsCard({ keyword }: { keyword: string }) {
   return (
     <Card
       title="Your Reels"
-      description={`Give a Reel a DM and people who comment ${keyword} get it once (Instagram allows one private reply per comment, within 7 days). Reels without a DM are left alone, e.g. Meesho, whose app replies itself.`}
+      description={`Give a Reel a DM and people who comment ${splitKeywords(keyword).join(" or ")} get it once (Instagram allows one private reply per comment, within 7 days). Reels without a DM are left alone, e.g. Meesho, whose app replies itself.`}
       actions={
         <Button size="sm" variant="outline" onClick={() => void reels.refetch()} disabled={reels.isFetching}>
           <RefreshCw className={cn(reels.isFetching && "animate-spin")} /> Reload

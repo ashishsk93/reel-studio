@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { InstagramAccountUpdateSchema } from '@reel/shared';
 import { matchesKeyword, mediaSignature, parseWebhook, verifyMediaSignature, verifySignature } from './webhook';
 
 describe('matchesKeyword', () => {
@@ -19,6 +20,28 @@ describe('matchesKeyword', () => {
   it('handles multi-word keywords and full-width text', () => {
     expect(matchesKeyword('send   me  LINK please', 'me link')).toBe(true);
     expect(matchesKeyword('ＬＩＮＫ', 'link')).toBe(true);
+  });
+
+  it('matches any word from a comma-separated list', () => {
+    expect(matchesKeyword('price please', 'LINK, PRICE, shop')).toBe(true);
+    expect(matchesKeyword('Shop!', 'LINK,PRICE,shop')).toBe(true);
+    expect(matchesKeyword('love it', 'LINK, PRICE')).toBe(false);
+    expect(matchesKeyword('priced well', 'LINK, PRICE')).toBe(false);
+    expect(matchesKeyword('link', ' , ')).toBe(false);
+  });
+});
+
+describe('InstagramAccountUpdateSchema keyword', () => {
+  const parse = (keyword: string) => InstagramAccountUpdateSchema.safeParse({ keyword });
+
+  it('stores a tidy, de-duplicated list', () => {
+    expect(parse(' LINK ,price,,  want  this, link ').data?.keyword).toBe('LINK, price, want this');
+  });
+
+  it('rejects empty lists and bad words', () => {
+    expect(parse(' , ').success).toBe(false);
+    expect(parse('LINK, x').success).toBe(false);
+    expect(parse('LINK, $$$').success).toBe(false);
   });
 });
 

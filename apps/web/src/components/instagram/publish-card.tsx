@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
-import type { InstagramProjectDto, JobDto } from "@reel/shared";
+import { splitKeywords, type InstagramProjectDto, type JobDto } from "@reel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -118,7 +118,7 @@ function PublishForm({ projectId, renderId, data }: { projectId: string; renderI
           </label>
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={form.autoReply} onCheckedChange={(v) => setForm({ ...form, autoReply: v })} /> DM people who comment{" "}
-            <span className="font-mono">{data.defaults.keyword}</span>
+            <span className="font-mono">{splitKeywords(data.defaults.keyword).join(" or ")}</span>
           </label>
           {data.otherAppReplies && !form.autoReply && (
             <p className="-mt-1 text-xs text-muted-foreground">

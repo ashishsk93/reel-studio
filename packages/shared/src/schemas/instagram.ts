@@ -8,18 +8,35 @@ export const InstagramConnectSchema = z.object({
 });
 export type InstagramConnectInput = z.infer<typeof InstagramConnectSchema>;
 
-const Keyword = z
+const KEYWORD_RE = /^[\p{L}\p{N}_-]+(?: [\p{L}\p{N}_-]+)*$/u;
+
+/** "LINK, price,  shop" → ["LINK", "price", "shop"]: the stored form is comma-separated. */
+export function splitKeywords(keywords: string): string[] {
+  return keywords
+    .split(',')
+    .map((k) => k.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+}
+
+/** Comma-separated trigger words, stored as "LINK, PRICE"; any one of them triggers the DM. */
+const Keywords = z
   .string()
-  .trim()
-  .min(2, 'At least 2 characters')
-  .max(40)
-  .regex(/^[\p{L}\p{N}_-]+(?: [\p{L}\p{N}_-]+)*$/u, 'Letters, numbers, dashes or underscores');
+  .transform(splitKeywords)
+  .superRefine((list, ctx) => {
+    if (list.length === 0) ctx.addIssue({ code: 'custom', message: 'Add at least one keyword' });
+    if (list.length > 20) ctx.addIssue({ code: 'custom', message: 'At most 20 keywords' });
+    for (const k of list) {
+      if (k.length < 2 || k.length > 40) ctx.addIssue({ code: 'custom', message: `"${k}": 2 to 40 characters` });
+      else if (!KEYWORD_RE.test(k)) ctx.addIssue({ code: 'custom', message: `"${k}": letters, numbers, dashes or underscores` });
+    }
+  })
+  .transform((list) => list.filter((k, i) => list.findIndex((o) => o.toLowerCase() === k.toLowerCase()) === i).join(', '));
 
 /** Account switches and the reply settings every Reel shares. */
 export const InstagramAccountUpdateSchema = z.object({
   autoReply: z.boolean().optional(),
   poll: z.boolean().optional(),
-  keyword: Keyword.optional(),
+  keyword: Keywords.optional(),
   commentReply: z.string().trim().max(300).nullable().optional(),
 });
 export type InstagramAccountUpdate = z.infer<typeof InstagramAccountUpdateSchema>;
