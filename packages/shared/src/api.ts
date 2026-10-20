@@ -661,3 +661,9 @@ export interface ApiErrorBody {
   message: string;
   issues?: Array<{ path: string; message: string }>;
 }
+
+/** GET /auth/status: sign-in is on for the hosted app, off locally. */
+export interface AuthStatusDto {
+  enabled: boolean;
+  signedIn: boolean;
+}

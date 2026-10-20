@@ -29,6 +29,13 @@ export interface AppConfig {
   webOrigin: string;
   /** Public HTTPS origin the API is reachable at (webhooks, media for publishing); '' when local only. */
   publicUrl: string;
+  /** Sign-in for the hosted app; off when AUTH_PASSWORD_HASH or AUTH_SECRET is blank (local use). */
+  auth: {
+    enabled: boolean;
+    username: string;
+    passwordHash: string;
+    secret: string;
+  };
   instagram: {
     appSecret: string;
     verifyToken: string;
@@ -57,6 +64,11 @@ const EnvSchema = z.object({
   HOST: z.string().trim().optional(),
   /** e.g. https://studio.velra.tech. Needed to publish to Instagram and receive its webhooks. */
   PUBLIC_URL: z.string().trim().url().optional(),
+  /** Sign-in for the hosted app (docs/hosting.md). Hash from `pnpm --filter @reel/api auth:hash`. */
+  AUTH_USERNAME: z.string().trim().default('admin'),
+  AUTH_PASSWORD_HASH: z.string().trim().default(''),
+  /** Signs session cookies; changing it signs everyone out. */
+  AUTH_SECRET: z.string().trim().default(''),
   /** Optional: Instagram API with Instagram Login (your own account). App secret signs webhooks and media links. */
   INSTAGRAM_APP_SECRET: z.string().trim().default(''),
   INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().trim().default(''),
@@ -116,6 +128,12 @@ export function loadConfig(options: { repoRoot?: string; env?: NodeJS.ProcessEnv
     apiOrigin: publicUrl || `http://localhost:${env.PORT_API}`,
     webOrigin: publicUrl || `http://localhost:${env.PORT_WEB}`,
     publicUrl,
+    auth: {
+      enabled: Boolean(env.AUTH_PASSWORD_HASH && env.AUTH_SECRET),
+      username: env.AUTH_USERNAME,
+      passwordHash: env.AUTH_PASSWORD_HASH,
+      secret: env.AUTH_SECRET,
+    },
     instagram: {
       appSecret: env.INSTAGRAM_APP_SECRET,
       verifyToken: env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,

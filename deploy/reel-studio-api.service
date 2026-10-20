@@ -19,6 +19,8 @@ Group=reelstudio
 WorkingDirectory=/srv/reel-studio/apps/api
 ExecStart=/usr/bin/node dist/main
 Environment=NODE_ENV=production
+# Plain log lines in the journal: fail2ban matches `AUTH-FAIL ip=…` (deploy/fail2ban/).
+Environment=NO_COLOR=1
 
 Restart=always
 RestartSec=2

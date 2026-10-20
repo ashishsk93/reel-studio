@@ -47,6 +47,7 @@ Not in the repository (git-ignored), so a fresh clone needs them: `.env` (your k
 | `DATA_DIR` | `./data` | Database, uploads, renders and logs. Relative to the repo root. |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Full paths if they aren't on your PATH. |
 | `PORT_API` / `PORT_WEB` | `4000` / `3000` | |
+| `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` / `AUTH_SECRET` | `admin` / — / — | Sign-in for the hosted app; off when the hash or secret is blank, as on your own computer. Make the hash and secret with `pnpm --filter @reel/api auth:hash`. See [docs/hosting.md](docs/hosting.md). |
 | `HOST` | all interfaces | Bind address for the API; `127.0.0.1` on the server, behind nginx. |
 | `PUBLIC_URL` | — | Public HTTPS address of the app, e.g. `https://studio.velra.tech`. File links and CORS use it, the web app is built against it, Instagram downloads `final.mp4` from it when publishing, and its webhooks arrive there. Hosting: [docs/hosting.md](docs/hosting.md). |
 | `INSTAGRAM_APP_SECRET` | — | Optional. Your Meta app's Instagram app secret: checks webhook signatures and signs the video links. See [docs/instagram.md](docs/instagram.md). |

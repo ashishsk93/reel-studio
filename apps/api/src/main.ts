@@ -13,7 +13,7 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create(AppModule.forRoot(config, tools), { bufferLogs: false, rawBody: true });
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: [config.webOrigin, `http://localhost:${config.portWeb}`, `http://127.0.0.1:${config.portWeb}`] });
+  app.enableCors({ origin: [config.webOrigin, `http://localhost:${config.portWeb}`, `http://127.0.0.1:${config.portWeb}`], credentials: true });
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableShutdownHooks();
 

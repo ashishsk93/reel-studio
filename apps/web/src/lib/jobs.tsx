@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { JobDto } from "@reel/shared";
@@ -17,15 +18,17 @@ const JobEventsContext = createContext<JobEvents | null>(null);
 /** One EventSource for the whole app; components subscribe to job updates through it. */
 export function JobEventsProvider({ children }: { children: ReactNode }) {
   const listeners = useRef(new Set<Listener>());
+  const onLogin = usePathname() === "/login";
 
   useEffect(() => {
+    if (onLogin) return;
     const source = new EventSource(`${API_URL}/events`);
     source.addEventListener("job", (event) => {
       const job = JSON.parse((event as MessageEvent<string>).data) as JobDto;
       listeners.current.forEach((listener) => listener(job));
     });
     return () => source.close();
-  }, []);
+  }, [onLogin]);
 
   const subscribe = useCallback((listener: Listener) => {
     listeners.current.add(listener);

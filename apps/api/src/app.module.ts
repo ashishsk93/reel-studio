@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
 import { AssetsModule } from './assets/assets.module';
 import { ComposeModule } from './compose/compose.module';
 import { RenderModule } from './render/render.module';
@@ -37,6 +38,7 @@ export class AppModule {
         SourcesModule,
         UsageModule,
         InstagramModule,
+        AuthModule,
       ],
       controllers: [HealthController],
     };

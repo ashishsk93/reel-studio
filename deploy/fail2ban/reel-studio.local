@@ -13,9 +13,8 @@
 enabled  = true
 filter   = reel-studio-auth
 port     = http,https
-logpath  = /var/log/nginx/reel-studio.error.log
-# The nginx log is a file, not the journal (Debian's default backend is systemd).
-backend  = polling
+# Failed sign-ins are logged by the API to the systemd journal (see the filter's journalmatch).
+backend  = systemd
 
 maxretry = 5
 findtime = 10m

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Clapperboard, MessageCircleReply, Moon, Settings, Store, Sun, Users } from "lucide-react";
+import { BarChart3, Clapperboard, LogOut, MessageCircleReply, Moon, Settings, Store, Sun, Users } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import type { HealthDto } from "@reel/shared";
+import type { AuthStatusDto, HealthDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
 import { Shortcuts } from "@/components/shortcuts";
 import { api } from "@/lib/api";
@@ -23,6 +23,8 @@ const NAV = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // The login page is full-screen, without the sidebar.
+  if (pathname === "/login") return <>{children}</>;
 
   return (
     <div className="flex min-h-screen">
@@ -61,6 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex flex-col">
             <Shortcuts />
             <ThemeToggle />
+            <SignOut />
           </div>
         </div>
       </aside>
@@ -115,6 +118,27 @@ function StatusPanel() {
       <br />
       AI answers are canned fixtures. Add your key in <code className="font-mono">.env</code> and set LLM_MODE=live.
     </div>
+  );
+}
+
+/** Only on the hosted app, where sign-in is on. */
+function SignOut() {
+  const { data } = useQuery({ queryKey: ["auth-status"], queryFn: () => api.get<AuthStatusDto>("/auth/status"), staleTime: Infinity });
+  if (!data?.enabled) return null;
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="justify-start"
+      onClick={async () => {
+        await api.post("/auth/logout").catch(() => undefined);
+        // A full load, not a client-side push: the session is gone and every query and stream must restart.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign("/login");
+      }}
+    >
+      <LogOut /> Sign out
+    </Button>
   );
 }
 

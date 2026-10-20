@@ -1,15 +1,16 @@
 # Hosting Reel Studio on the VPS
 
-Reel Studio runs on the same Hostinger VPS as velra.tech, at **https://studio.velra.tech**, behind a password. velra.tech and carromino.velra.tech are untouched: the new site is a separate nginx server block, separate system user, separate folder and separate ports.
+Reel Studio runs on the same Hostinger VPS as velra.tech, at **https://studio.velra.tech**, behind its own sign-in page. velra.tech and carromino.velra.tech are untouched: the new site is a separate nginx server block, separate system user, separate folder and separate ports.
 
 | | |
 |---|---|
-| Address | `https://studio.velra.tech`, HTTP basic auth (one user) |
+| Address | `https://studio.velra.tech`, sign-in page in the app's own style (one user, 30-day session cookie) |
 | Code | `/srv/reel-studio`, owned by the `reelstudio` system user |
 | Data | `/srv/reel-studio/data`: database, uploads, renders, logs. **Back this up.** |
 | Processes | `reel-studio-api` (Nest, `127.0.0.1:4100`) and `reel-studio-web` (Next, `127.0.0.1:3100`), both systemd |
-| Public without the password | `/api/instagram/webhook` (signature-checked) and `/api/instagram/media/…` (signed, 3-hour links), because Meta calls them |
-| Password guessing | nginx caps each address at 10 requests/s; fail2ban blocks an address after 5 wrong passwords in 10 minutes, for 10 minutes, doubling with every repeat ban up to a week |
+| How it's enforced | nginx checks the session on every request before it reaches the app (`auth_request`); no session → `/login` |
+| Open without signing in | the sign-in page and its scripts; `/api/instagram/webhook` (signature-checked) and `/api/instagram/media/…` (signed, 3-hour links), because Meta calls them |
+| Password guessing | 5 sign-in attempts a minute per address; fail2ban blocks an address after 5 wrong passwords in 10 minutes, for 10 minutes, doubling with every repeat ban up to a week |
 
 velra.tech keeps `127.0.0.1:3000`. Nothing here listens on a public port; nginx is the only way in.
 
@@ -33,11 +34,11 @@ dig +short studio.velra.tech
 
 ## 2. Packages
 
-Node 22 and certbot are already on the box. Add FFmpeg (renders), `htpasswd` (the password file) and fail2ban (blocks password guessing):
+Node 22 and certbot are already on the box. Add FFmpeg (renders) and fail2ban (blocks password guessing):
 
 ```bash
 sudo apt update
-sudo apt install -y ffmpeg apache2-utils fail2ban
+sudo apt install -y ffmpeg fail2ban
 command -v node && node --version          # needs v22.12+; the units assume /usr/bin/node
 command -v corepack                        # ships with Node 22; runs the pinned pnpm
 ```
@@ -87,6 +88,10 @@ FFMPEG_PATH=/usr/bin/ffmpeg
 FFPROBE_PATH=/usr/bin/ffprobe
 # Any long random string; the same value goes into Meta's webhook settings (step 10).
 INSTAGRAM_WEBHOOK_VERIFY_TOKEN=
+# Sign-in (step 6)
+AUTH_USERNAME=ashish
+AUTH_PASSWORD_HASH=
+AUTH_SECRET=
 ```
 
 Generate the verify token with `openssl rand -hex 24`. Then lock the file down:
@@ -122,11 +127,17 @@ sudo rm /tmp/reel-data.tgz
 
 ```bash
 sudo certbot certonly --nginx -d studio.velra.tech
-sudo htpasswd -c /etc/nginx/reel-studio.htpasswd ashish      # asks for the password twice
-sudo chown root:www-data /etc/nginx/reel-studio.htpasswd && sudo chmod 640 /etc/nginx/reel-studio.htpasswd
 ```
 
-The browser asks for this username and password once and remembers it. To change the password later, run `htpasswd` again without `-c`.
+Make the password hash on **your computer (PC)**, so the password never touches the server, even in shell history:
+
+```powershell
+pnpm --filter @reel/api auth:hash
+```
+
+It asks for the password twice (at least 12 characters, not shown as you type) and prints two lines. Paste both into the server's `.env`, replacing the empty `AUTH_PASSWORD_HASH=` and `AUTH_SECRET=`. The hash is scrypt, so the `.env` never holds the password itself.
+
+To change the password later, run it again, replace both lines and restart the API (`sudo systemctl restart reel-studio-api`). A new `AUTH_SECRET` also signs out every browser.
 
 ## 7. Services and first deploy
 
@@ -152,7 +163,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 8b. Block password guessing
 
-nginx already holds every address to 10 requests a second. fail2ban adds the lockout: it watches this site's error log, and after **5 wrong passwords within 10 minutes** it blocks that address at the firewall for 10 minutes. Each later ban of the same address doubles (20 min, 40, 80 …) up to **one week**, and fail2ban remembers past bans across restarts.
+nginx already lets each address try to sign in only 5 times a minute, and the API pauses before answering a wrong password. fail2ban adds the lockout: it watches the API's log for failed sign-ins, and after **5 wrong passwords within 10 minutes** it blocks that address at the firewall for 10 minutes. Each later ban of the same address doubles (20 min, 40, 80 …) up to **one week**, and fail2ban remembers past bans across restarts.
 
 ```bash
 sudo cp /srv/reel-studio/deploy/fail2ban/reel-studio-auth.conf /etc/fail2ban/filter.d/
@@ -162,24 +173,25 @@ sudo fail2ban-client reload
 sudo fail2ban-client status reel-studio-auth        # "Currently banned: 0"
 ```
 
-Test it from your phone on mobile data, so a ban doesn't lock out your computer: open the site and enter a wrong password 5 times. The site then stops loading on the phone, and `sudo fail2ban-client status reel-studio-auth` lists its address. Lift the ban with:
+Test it from your phone on mobile data, so a ban doesn't lock out your computer: open the site and enter a wrong password 5 times. The site then stops loading on the phone, and `sudo fail2ban-client status reel-studio-auth` lists its address. Each failure also shows in `journalctl -u reel-studio-api | grep AUTH-FAIL`. Lift the ban with:
 
 ```bash
 sudo fail2ban-client set reel-studio-auth unbanip PHONE.IP
 ```
 
-Only wrong passwords and unknown usernames count. The password prompt itself (a visit before you've typed anything) does not, so normal use never trips it. A ban covers ports 80 and 443 for that address, which includes velra.tech.
+Only wrong passwords and unknown usernames count; opening the sign-in page does not, so normal use never trips it. A ban covers ports 80 and 443 for that address, which includes velra.tech.
 
 ## 9. Check
 
 ```bash
-curl -sI https://studio.velra.tech | head -1                                    # 401: password wall is up
-curl -s -u ashish https://studio.velra.tech/api/health | head -c 80; echo        # {"ok":true,...}
+curl -sI https://studio.velra.tech/projects | grep -iE '^(HTTP|location)'       # 302 → /login?next=/projects
+curl -s -o /dev/null -w "%{http_code}\n" https://studio.velra.tech/api/health      # 401 without a session
+curl -s https://studio.velra.tech/api/auth/status; echo                          # {"enabled":true,"signedIn":false}
 curl -s "https://studio.velra.tech/api/instagram/webhook?hub.mode=subscribe&hub.verify_token=WRONG&hub.challenge=1" -o /dev/null -w "%{http_code}\n"   # 403
 curl -sI https://velra.tech | head -1 && curl -sI https://carromino.velra.tech | head -1                       # unchanged: 200
 ```
 
-Then open https://studio.velra.tech, log in, and check that your projects, influencers and the Instagram page are all there.
+Then open https://studio.velra.tech, sign in, and check that your projects, influencers and the Instagram page are all there. **Sign out** is at the bottom of the sidebar.
 
 ## 10. Instagram webhooks
 
@@ -193,6 +205,31 @@ Click **Verify and save**, then subscribe to the **comments** field. Keyword com
 Posting from the Export step also works now: Instagram downloads the video from a signed `studio.velra.tech` link.
 
 ---
+
+## Switching an existing server from the password box to the sign-in page
+
+For a server set up with the earlier HTTP basic auth (the browser's grey username/password box):
+
+1. **(PC)** `pnpm --filter @reel/api auth:hash`, then add `AUTH_USERNAME`, `AUTH_PASSWORD_HASH` and `AUTH_SECRET` to `/srv/reel-studio/.env` (step 4).
+2. Deploy the new code, and update the API service (it now logs plainly for fail2ban):
+   ```bash
+   sudo cp /srv/reel-studio/deploy/reel-studio-api.service /etc/systemd/system/ && sudo systemctl daemon-reload
+   sudo /srv/reel-studio/scripts/deploy.sh
+   ```
+3. Swap nginx over to the sign-in page:
+   ```bash
+   nginx -V 2>&1 | grep -o auth_request          # must print auth_request
+   sudo cp /srv/reel-studio/deploy/nginx/studio.velra.tech.conf /etc/nginx/sites-available/studio.velra.tech
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+4. Point fail2ban at the new log lines:
+   ```bash
+   sudo cp /srv/reel-studio/deploy/fail2ban/reel-studio-auth.conf /etc/fail2ban/filter.d/
+   sudo cp /srv/reel-studio/deploy/fail2ban/reel-studio.local /etc/fail2ban/jail.d/
+   sudo fail2ban-client reload && sudo fail2ban-client status reel-studio-auth
+   ```
+5. Remove the old password file: `sudo rm /etc/nginx/reel-studio.htpasswd`.
+6. Run the checks in step 9.
 
 ## Updating
 

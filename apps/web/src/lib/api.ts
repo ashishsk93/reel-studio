@@ -29,9 +29,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     throw new ApiError(0, "Can't reach the API. Is `pnpm dev` running?");
   }
+  if (response.status === 401 && !path.startsWith("/auth/") && typeof window !== "undefined" && window.location.pathname !== "/login") {
+    // A full load, not a client-side push: the session is gone and every query and stream must restart.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    throw new ApiError(401, "Signed out");
+  }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : undefined;
+  let data: unknown;
+  try {
+    data = text ? (JSON.parse(text) as unknown) : undefined;
+  } catch {
+    // nginx answers some errors (401, 429, 502) with HTML.
+    data = undefined;
+  }
   if (!response.ok) {
     const err = (data ?? {}) as Partial<ApiErrorBody>;
     throw new ApiError(response.status, err.message ?? response.statusText, err.issues);
