@@ -76,13 +76,19 @@ export class GraphClient {
     return res.data;
   }
 
-  /** Top-level comments with their replies, newest first. */
-  async comments(mediaId: string): Promise<GraphComment[]> {
-    const res = await this.get<{ data: GraphComment[] }>(`/${mediaId}/comments`, {
+  /** Top-level comments with their replies, newest first, following pages up to `maxPages`. */
+  async comments(mediaId: string, maxPages = 10): Promise<GraphComment[]> {
+    type Page = { data: GraphComment[]; paging?: { next?: string } };
+    let page = await this.get<Page>(`/${mediaId}/comments`, {
       fields: 'id,text,timestamp,from{id,username},replies{id,text,timestamp,from{id,username}}',
       limit: '50',
     });
-    return res.data.flatMap((c) => [c, ...(c.replies?.data ?? [])]);
+    const all = [...page.data];
+    for (let i = 1; i < maxPages && page.paging?.next; i++) {
+      page = await this.call<Page>('GET', page.paging.next, {});
+      all.push(...page.data);
+    }
+    return all.flatMap((c) => [c, ...(c.replies?.data ?? [])]);
   }
 
   /** One DM to the commenter, allowed once per comment within 7 days of it. */

@@ -3,7 +3,7 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PRIVATE_REPLY_WINDOW_MS, shouldReply } from './auto-reply';
 import { InstagramService } from './instagram.service';
-import { parseWebhook, type IgComment } from './webhook';
+import { matchesKeyword, parseWebhook, type IgComment } from './webhook';
 
 const POLL_MS = 90_000;
 
@@ -47,8 +47,12 @@ export class AutoReplyService implements OnModuleInit, OnModuleDestroy {
     const rule = await this.prisma.instagramRule.findUnique({ where: { mediaId: comment.mediaId } });
     if (!rule || !shouldReply(comment, rule, account.keyword)) return null;
 
-    // One DM per person per Reel: people often comment the keyword twice.
-    const already = await this.prisma.instagramReply.findFirst({ where: { fromId: comment.fromId, mediaId: comment.mediaId, status: 'sent' } });
+    // One DM per person per Reel: people often comment the keyword twice. Someone who asked
+    // before the DM was set was likely answered by hand, so they count as done too.
+    const earlier = await this.prisma.instagramReply.findMany({
+      where: { fromId: comment.fromId, mediaId: comment.mediaId, status: { in: ['sent', 'existing'] } },
+    });
+    const already = earlier.some((r) => r.status === 'sent' || matchesKeyword(r.text, account.keyword));
     const base = {
       kind: 'comment',
       sourceId: comment.id,
@@ -62,7 +66,7 @@ export class AutoReplyService implements OnModuleInit, OnModuleDestroy {
     // The unique sourceId doubles as a lock between the webhook and the poller.
     try {
       await this.prisma.instagramReply.create({
-        data: { ...base, status: already ? 'skipped' : 'pending', detail: already ? 'Already sent this person the DM' : null },
+        data: { ...base, status: already ? 'skipped' : 'pending', detail: already ? 'Already answered this person' : null },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;

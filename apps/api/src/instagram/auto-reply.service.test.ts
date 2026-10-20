@@ -16,6 +16,8 @@ describe('AutoReplyService', () => {
   let service: AutoReplyService;
   const sent: Array<{ to: string; text: string; via: string }> = [];
   let failNext = false;
+  let onReel: Array<{ id: string; text: string; timestamp: string; from: { id: string; username: string } }> = [];
+  let instagram: InstagramService;
 
   const graph = {
     privateReply: async (commentId: string, text: string) => {
@@ -27,6 +29,7 @@ describe('AutoReplyService', () => {
       return {};
     },
     replyToComment: async (id: string, text: string) => (sent.push({ to: id, text, via: 'public' }), { id: 'r' }),
+    comments: async () => onReel,
   } as unknown as GraphClient;
 
   beforeAll(async () => {
@@ -41,7 +44,7 @@ describe('AutoReplyService', () => {
         await prisma.$executeRawUnsafe(statement);
       }
     }
-    const instagram = new InstagramService(config, prisma);
+    instagram = new InstagramService(config, prisma);
     instagram.client = async () => ({ client: graph, account: (await instagram.account()) as never });
     service = new AutoReplyService(prisma, instagram);
   });
@@ -110,6 +113,35 @@ describe('AutoReplyService', () => {
     await prisma.instagramRule.create({ data: { dmText: 'Other Reel link', mediaId: 'm2' } });
     expect(await service.handle(comment('c2', 'u1', 'link', 'm2'))).toBe('sent');
     expect(sent[0]).toEqual({ to: 'c2', text: 'Other Reel link', via: 'private' });
+  });
+
+  it('skips comments already on a Reel when its DM is first set', async () => {
+    onReel = [
+      { id: 'old1', text: 'LINK', timestamp: new Date().toISOString(), from: { id: 'u1', username: 'u1' } },
+      { id: 'old2', text: 'so pretty', timestamp: new Date().toISOString(), from: { id: 'u2', username: 'u2' } },
+      { id: 'mine', text: 'thanks!', timestamp: new Date().toISOString(), from: { id: 'own', username: 'slay' } },
+    ];
+    await instagram.setReelDm('m3', { dmText: 'Reel 3 link' });
+    expect(await prisma.instagramReply.count({ where: { mediaId: 'm3', status: 'existing' } })).toBe(2);
+    expect(await instagram.activity()).toEqual([]);
+
+    const on3 = (id: string, from: string, text: string): IgComment => ({ ...comment(id, from, text), mediaId: 'm3' });
+    expect(await service.handle(on3('old1', 'u1', 'LINK'))).toBeNull();
+    // u1 asked before and was answered by hand; u2 only said "so pretty" before.
+    expect(await service.handle(on3('new1', 'u1', 'link again'))).toBe('skipped');
+    expect(await service.handle(on3('new2', 'u2', 'link'))).toBe('sent');
+    expect(sent.filter((x) => x.via === 'private')).toEqual([{ to: 'new2', text: 'Reel 3 link', via: 'private' }]);
+
+    // Editing the DM later doesn't re-mark anything.
+    onReel = [...onReel, { id: 'later', text: 'link', timestamp: new Date().toISOString(), from: { id: 'u3', username: 'u3' } }];
+    await instagram.setReelDm('m3', { dmText: 'Reel 3 new link' });
+    expect(await service.handle(on3('later', 'u3', 'link'))).toBe('sent');
+  });
+
+  it('can DM people who already commented when asked', async () => {
+    onReel = [{ id: 'old9', text: 'link', timestamp: new Date().toISOString(), from: { id: 'u9', username: 'u9' } }];
+    await instagram.setReelDm('m4', { dmText: 'Reel 4 link', includeExisting: true });
+    expect(await service.handle({ ...comment('old9', 'u9', 'link'), mediaId: 'm4' })).toBe('sent');
   });
 
   it('uses the shared keyword', async () => {

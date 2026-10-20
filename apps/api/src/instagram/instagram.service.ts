@@ -12,6 +12,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Refresh when fewer than this many days are left (tokens last 60). */
 const REFRESH_WITHIN_DAYS = 20;
 const REFRESH_CHECK_MS = 6 * 60 * 60 * 1000;
+/** Reply-log status for comments that were already on a Reel when its DM was set; hidden from the activity list. */
+const SKIPPED_EXISTING = 'existing';
 
 /** The connected account, its token, the shared reply settings and each Reel's DM. */
 @Injectable()
@@ -195,9 +197,11 @@ export class InstagramService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** Sets (or replaces) the DM for one Reel. */
+  /** Sets (or replaces) the DM for one Reel. The first time, comments already there are skipped unless asked otherwise. */
   async setReelDm(mediaId: string, body: unknown, projectId: string | null = null): Promise<void> {
     const input = parseOrThrow(InstagramReelDmSchema, body);
+    const isNew = !(await this.prisma.instagramRule.findUnique({ where: { mediaId } }));
+    if (isNew && !input.includeExisting) await this.skipExistingComments(mediaId);
     await this.prisma.instagramRule.upsert({
       where: { mediaId },
       create: { mediaId, dmText: input.dmText, enabled: input.enabled, projectId },
@@ -209,8 +213,42 @@ export class InstagramService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.instagramRule.deleteMany({ where: { mediaId } });
   }
 
+  /**
+   * Marks every comment currently on a Reel as handled, so only comments made from now on get
+   * the DM. For people who were already answered by hand. Returns how many were marked.
+   */
+  async skipExistingComments(mediaId: string): Promise<number> {
+    const { client, account } = await this.client();
+    const comments = (await client.comments(mediaId)).filter((c) => c.from?.id && c.from.id !== account.igUserId);
+    const known = new Set(
+      (await this.prisma.instagramReply.findMany({ where: { sourceId: { in: comments.map((c) => c.id) } }, select: { sourceId: true } })).map(
+        (r) => r.sourceId,
+      ),
+    );
+    const fresh = comments.filter((c) => !known.has(c.id));
+    if (fresh.length) {
+      await this.prisma.instagramReply.createMany({
+        data: fresh.map((c) => ({
+          kind: 'comment',
+          sourceId: c.id,
+          mediaId,
+          fromId: c.from!.id,
+          fromUsername: c.from!.username ?? null,
+          text: c.text.slice(0, 1000),
+          status: SKIPPED_EXISTING,
+          detail: 'Commented before the DM was set',
+        })),
+      });
+    }
+    return fresh.length;
+  }
+
   async activity(limit = 100): Promise<InstagramReplyDto[]> {
-    const rows = await this.prisma.instagramReply.findMany({ orderBy: { createdAt: 'desc' }, take: Math.min(limit, 500) });
+    const rows = await this.prisma.instagramReply.findMany({
+      where: { status: { not: SKIPPED_EXISTING } },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 500),
+    });
     const posts = await this.prisma.instagramPost.findMany({ where: { mediaId: { in: rows.map((r) => r.mediaId).filter((x): x is string => Boolean(x)) } } });
     const permalink = new Map(posts.map((p) => [p.mediaId, p.permalink]));
     return rows.map((r) => ({

@@ -92,6 +92,11 @@ export class InstagramController {
     return this.instagram.setReelDm(mediaId, body);
   }
 
+  @Post('instagram/reels/:mediaId/skip-existing')
+  async skipExisting(@Param('mediaId') mediaId: string) {
+    return { skipped: await this.instagram.skipExistingComments(mediaId) };
+  }
+
   @Delete('instagram/reels/:mediaId/dm')
   @HttpCode(204)
   clearDm(@Param('mediaId') mediaId: string) {

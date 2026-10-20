@@ -244,10 +244,16 @@ function ReelsCard({ keyword }: { keyword: string }) {
 function ReelRow({ reel }: { reel: InstagramReelDto }) {
   const queryClient = useQueryClient();
   const [text, setText] = useSyncedState(reel.dmText, () => reel.dmText ?? "");
+  const [includeExisting, setIncludeExisting] = useState(false);
   const refresh = () => queryClient.invalidateQueries({ queryKey: instagramKeys.reels });
   const save = useMutation({
-    mutationFn: (enabled: boolean) => api.put(`/instagram/reels/${reel.mediaId}/dm`, { dmText: text, enabled }),
+    mutationFn: (enabled: boolean) => api.put(`/instagram/reels/${reel.mediaId}/dm`, { dmText: text, enabled, includeExisting }),
     onSuccess: () => (toast.success("DM saved"), void refresh()),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const skipExisting = useMutation({
+    mutationFn: () => api.post<{ skipped: number }>(`/instagram/reels/${reel.mediaId}/skip-existing`),
+    onSuccess: ({ skipped }) => toast.success(skipped ? `Skipped ${skipped} existing comment${skipped === 1 ? "" : "s"}` : "No new comments to skip"),
     onError: (e) => toast.error(errorMessage(e)),
   });
   const clear = useMutation({
@@ -288,15 +294,28 @@ function ReelRow({ reel }: { reel: InstagramReelDto }) {
         <p className="line-clamp-1 text-sm">{reel.caption ?? "(no caption)"}</p>
         <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder="The DM for this Reel, with its link…" />
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {reel.dmText && (
+          {reel.dmText ? (
             <>
               <label className="mr-auto flex items-center gap-2 text-xs">
                 <Switch checked={reel.enabled} disabled={dirty || save.isPending} onCheckedChange={(v) => save.mutate(v)} /> Send it
               </label>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Mark every comment on this Reel so far as answered; only new comments get the DM"
+                onClick={() => skipExisting.mutate()}
+                disabled={skipExisting.isPending}
+              >
+                {skipExisting.isPending && <Loader2 className="animate-spin" />} Skip current comments
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => clear.mutate()} disabled={clear.isPending}>
                 Remove DM
               </Button>
             </>
+          ) : (
+            <label className="mr-auto flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch checked={includeExisting} onCheckedChange={setIncludeExisting} size="sm" /> Also DM people who already commented
+            </label>
           )}
           <Button size="sm" onClick={() => save.mutate(reel.dmText ? reel.enabled : true)} disabled={!dirty || !text.trim() || save.isPending}>
             {save.isPending && <Loader2 className="animate-spin" />} Save DM

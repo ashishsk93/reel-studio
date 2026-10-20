@@ -28,6 +28,8 @@ export type InstagramAccountUpdate = z.infer<typeof InstagramAccountUpdateSchema
 export const InstagramReelDmSchema = z.object({
   dmText: z.string().trim().min(1, 'Write the DM').max(1000),
   enabled: z.boolean().default(true),
+  /** When the DM is first set: also DM people who already commented. Off by default, since they may have been answered by hand. */
+  includeExisting: z.boolean().default(false),
 });
 export type InstagramReelDmInput = z.input<typeof InstagramReelDmSchema>;
 
