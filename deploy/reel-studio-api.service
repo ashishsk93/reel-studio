@@ -1,0 +1,47 @@
+# reel-studio-api: the Nest API (jobs, FFmpeg renders, Instagram poller) behind nginx.
+#
+# Install (docs/hosting.md, step 6):
+#   sudo cp deploy/reel-studio-api.service deploy/reel-studio-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now reel-studio-api reel-studio-web
+
+[Unit]
+Description=Reel Studio API (NestJS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reelstudio
+Group=reelstudio
+
+# The API finds the repo root (and its .env) by walking up from here.
+WorkingDirectory=/srv/reel-studio/apps/api
+ExecStart=/usr/bin/node dist/main
+Environment=NODE_ENV=production
+
+Restart=always
+RestartSec=2
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Hardening. It writes only to data/ (database, uploads, renders, logs).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/srv/reel-studio/data
+
+# FFmpeg renders are the heavy part.
+MemoryHigh=3G
+MemoryMax=4G
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=reel-studio-api
+
+[Install]
+WantedBy=multi-user.target

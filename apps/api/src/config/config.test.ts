@@ -16,6 +16,17 @@ describe('loadConfig', () => {
     expect(config.databaseUrl).toBe(`file:${path.join(root, 'data', 'app.db')}`);
   });
 
+  it('serves files from PUBLIC_URL and binds to HOST on a server', () => {
+    const local = loadConfig({ repoRoot: root, env: {} });
+    expect(local.apiOrigin).toBe('http://localhost:4000');
+    expect(local.host).toBeUndefined();
+    const server = loadConfig({ repoRoot: root, env: { PUBLIC_URL: 'https://studio.velra.tech/', HOST: '127.0.0.1', PORT_API: '4100' } });
+    expect(server.apiOrigin).toBe('https://studio.velra.tech');
+    expect(server.webOrigin).toBe('https://studio.velra.tech');
+    expect(server.host).toBe('127.0.0.1');
+    expect(server.portApi).toBe(4100);
+  });
+
   it('rejects an unknown LLM mode', () => {
     expect(() => loadConfig({ repoRoot: root, env: { LLM_MODE: 'turbo' } })).toThrow(/LLM_MODE/);
   });

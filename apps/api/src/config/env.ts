@@ -22,7 +22,9 @@ export interface AppConfig {
   ffprobePath: string;
   portApi: number;
   portWeb: number;
-  /** Absolute origin used to build file URLs, e.g. http://localhost:4000 */
+  /** Address the API listens on; 127.0.0.1 on a server so only nginx can reach it. */
+  host: string | undefined;
+  /** Absolute origin used to build file URLs: PUBLIC_URL when set, else http://localhost:4000 */
   apiOrigin: string;
   webOrigin: string;
   /** Public HTTPS origin the API is reachable at (webhooks, media for publishing); '' when local only. */
@@ -51,6 +53,8 @@ const EnvSchema = z.object({
   FFPROBE_PATH: z.string().trim().default('ffprobe'),
   PORT_API: z.coerce.number().int().positive().default(4000),
   PORT_WEB: z.coerce.number().int().positive().default(3000),
+  /** Bind address for the API, e.g. 127.0.0.1 behind nginx. Unset: all interfaces. */
+  HOST: z.string().trim().optional(),
   /** e.g. https://studio.velra.tech. Needed to publish to Instagram and receive its webhooks. */
   PUBLIC_URL: z.string().trim().url().optional(),
   /** Optional: Instagram API with Instagram Login (your own account). App secret signs webhooks and media links. */
@@ -89,6 +93,7 @@ export function loadConfig(options: { repoRoot?: string; env?: NodeJS.ProcessEnv
   }
   const env = parsed.data;
   const dataDir = path.resolve(repoRoot, env.DATA_DIR);
+  const publicUrl = (env.PUBLIC_URL ?? '').replace(/\/$/, '');
 
   return {
     repoRoot,
@@ -106,9 +111,11 @@ export function loadConfig(options: { repoRoot?: string; env?: NodeJS.ProcessEnv
     ffprobePath: env.FFPROBE_PATH,
     portApi: env.PORT_API,
     portWeb: env.PORT_WEB,
-    apiOrigin: `http://localhost:${env.PORT_API}`,
-    webOrigin: `http://localhost:${env.PORT_WEB}`,
-    publicUrl: (env.PUBLIC_URL ?? '').replace(/\/$/, ''),
+    host: env.HOST,
+    // Behind nginx the web app and the API share PUBLIC_URL (the API under /api).
+    apiOrigin: publicUrl || `http://localhost:${env.PORT_API}`,
+    webOrigin: publicUrl || `http://localhost:${env.PORT_WEB}`,
+    publicUrl,
     instagram: {
       appSecret: env.INSTAGRAM_APP_SECRET,
       verifyToken: env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,

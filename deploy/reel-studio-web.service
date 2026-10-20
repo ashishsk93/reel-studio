@@ -1,0 +1,41 @@
+# reel-studio-web: the Next web app behind nginx. Install with reel-studio-api.service.
+
+[Unit]
+Description=Reel Studio web (Next.js)
+After=network-online.target reel-studio-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reelstudio
+Group=reelstudio
+
+WorkingDirectory=/srv/reel-studio/apps/web
+# Loopback only: nginx is the only way in. 3000 belongs to velra.tech.
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --port 3100 --hostname 127.0.0.1
+Environment=NODE_ENV=production
+
+Restart=always
+RestartSec=2
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# Next keeps its runtime cache under .next/cache.
+ReadWritePaths=/srv/reel-studio/apps/web/.next
+
+MemoryHigh=1G
+MemoryMax=2G
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=reel-studio-web
+
+[Install]
+WantedBy=multi-user.target

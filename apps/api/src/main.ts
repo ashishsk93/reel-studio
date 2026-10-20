@@ -13,11 +13,11 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create(AppModule.forRoot(config, tools), { bufferLogs: false, rawBody: true });
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: [config.webOrigin, `http://127.0.0.1:${config.portWeb}`] });
+  app.enableCors({ origin: [config.webOrigin, `http://localhost:${config.portWeb}`, `http://127.0.0.1:${config.portWeb}`] });
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableShutdownHooks();
 
-  await app.listen(config.portApi);
+  await (config.host ? app.listen(config.portApi, config.host) : app.listen(config.portApi));
   logger.log(`API on ${config.apiOrigin}/api · LLM_MODE=${config.llmMode} · models ${config.modelDefault} / ${config.modelReview}`);
   logger.log(`DATA_DIR ${config.dataDir} · ${tools.ffmpeg}`);
 }
