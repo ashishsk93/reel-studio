@@ -9,6 +9,7 @@ Reel Studio runs on the same Hostinger VPS as velra.tech, at **https://studio.ve
 | Data | `/srv/reel-studio/data`: database, uploads, renders, logs. **Back this up.** |
 | Processes | `reel-studio-api` (Nest, `127.0.0.1:4100`) and `reel-studio-web` (Next, `127.0.0.1:3100`), both systemd |
 | Public without the password | `/api/instagram/webhook` (signature-checked) and `/api/instagram/media/…` (signed, 3-hour links), because Meta calls them |
+| Password guessing | nginx caps each address at 10 requests/s; fail2ban blocks an address after 5 wrong passwords in 10 minutes, for 10 minutes, doubling with every repeat ban up to a week |
 
 velra.tech keeps `127.0.0.1:3000`. Nothing here listens on a public port; nginx is the only way in.
 
@@ -26,11 +27,11 @@ dig +short studio.velra.tech
 
 ## 2. Packages
 
-Node 22 and certbot are already on the box. Add FFmpeg (renders) and `htpasswd` (the password file):
+Node 22 and certbot are already on the box. Add FFmpeg (renders), `htpasswd` (the password file) and fail2ban (blocks password guessing):
 
 ```bash
 sudo apt update
-sudo apt install -y ffmpeg apache2-utils
+sudo apt install -y ffmpeg apache2-utils fail2ban
 command -v node && node --version          # needs v22.12+; the units assume /usr/bin/node
 command -v corepack                        # ships with Node 22; runs the pinned pnpm
 ```
@@ -143,6 +144,26 @@ sudo nginx -t && sudo systemctl reload nginx
 
 `nginx -t` checks every site before the reload, so a mistake can't take velra.tech down.
 
+## 8b. Block password guessing
+
+nginx already holds every address to 10 requests a second. fail2ban adds the lockout: it watches this site's error log, and after **5 wrong passwords within 10 minutes** it blocks that address at the firewall for 10 minutes. Each later ban of the same address doubles (20 min, 40, 80 …) up to **one week**, and fail2ban remembers past bans across restarts.
+
+```bash
+sudo cp /srv/reel-studio/deploy/fail2ban/reel-studio-auth.conf /etc/fail2ban/filter.d/
+sudo cp /srv/reel-studio/deploy/fail2ban/reel-studio.local /etc/fail2ban/jail.d/
+sudo systemctl enable --now fail2ban
+sudo fail2ban-client reload
+sudo fail2ban-client status reel-studio-auth        # "Currently banned: 0"
+```
+
+Test it from your phone on mobile data, so a ban doesn't lock out your computer: open the site and enter a wrong password 5 times. The site then stops loading on the phone, and `sudo fail2ban-client status reel-studio-auth` lists its address. Lift the ban with:
+
+```bash
+sudo fail2ban-client set reel-studio-auth unbanip PHONE.IP
+```
+
+Only wrong passwords and unknown usernames count. The password prompt itself (a visit before you've typed anything) does not, so normal use never trips it. A ban covers ports 80 and 443 for that address, which includes velra.tech.
+
 ## 9. Check
 
 ```bash
@@ -182,6 +203,8 @@ sudo /srv/reel-studio/scripts/deploy.sh --rollback  # back to the previous commi
 journalctl -u reel-studio-api -f          # API, jobs, renders, Instagram poller
 journalctl -u reel-studio-web -f
 sudo systemctl restart reel-studio-api reel-studio-web
+sudo fail2ban-client status reel-studio-auth                 # who is banned right now
+sudo fail2ban-client set reel-studio-auth unbanip YOUR.IP     # if you lock yourself out
 ```
 
 ## Backups

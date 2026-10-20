@@ -1,0 +1,28 @@
+# fail2ban jail: block password guessing on studio.velra.tech, with growing bans.
+# Install: sudo cp deploy/fail2ban/reel-studio.local /etc/fail2ban/jail.d/
+#
+# 5 wrong passwords within 10 minutes → blocked for 10 minutes. Every further
+# ban of the same address doubles: 10 min, 20, 40, 80 ... up to one week.
+# fail2ban remembers past bans in its database, so the growth survives restarts.
+#
+# A ban drops the address at the firewall for ports 80 and 443, which covers
+# velra.tech too for that address. Locked yourself out?
+#   sudo fail2ban-client set reel-studio-auth unbanip YOUR.IP
+
+[reel-studio-auth]
+enabled  = true
+filter   = reel-studio-auth
+port     = http,https
+logpath  = /var/log/nginx/reel-studio.error.log
+# The nginx log is a file, not the journal (Debian's default backend is systemd).
+backend  = polling
+
+maxretry = 5
+findtime = 10m
+bantime  = 10m
+
+bantime.increment = true
+bantime.factor    = 1
+bantime.maxtime   = 1w
+
+ignoreip = 127.0.0.1/8 ::1
