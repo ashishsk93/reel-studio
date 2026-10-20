@@ -74,6 +74,11 @@ export class InstagramController {
     return this.autoReply.poll(true);
   }
 
+  @Post('instagram/replies/:id/send')
+  async sendAnyway(@Param('id') id: string) {
+    return { status: await this.autoReply.sendAnyway(id) };
+  }
+
   @Get('instagram/activity')
   activity(@Query('limit') limit?: string) {
     return this.instagram.activity(limit ? Number(limit) || 100 : 100);

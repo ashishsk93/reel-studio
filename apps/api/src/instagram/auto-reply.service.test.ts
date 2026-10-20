@@ -144,6 +144,16 @@ describe('AutoReplyService', () => {
     expect(await service.handle({ ...comment('old9', 'u9', 'link'), mediaId: 'm4' })).toBe('sent');
   });
 
+  it('sends anyway on request for a skipped or failed comment, once', async () => {
+    await service.handle(comment('c1'));
+    await service.handle(comment('c2'));
+    const skipped = await prisma.instagramReply.findUniqueOrThrow({ where: { sourceId: 'c2' } });
+    expect(skipped.status).toBe('skipped');
+    expect(await service.sendAnyway(skipped.id)).toBe('sent');
+    expect(sent.filter((x) => x.via === 'private').map((x) => x.to)).toEqual(['c1', 'c2']);
+    await expect(service.sendAnyway(skipped.id)).rejects.toThrow('already sent');
+  });
+
   it('uses the shared keyword', async () => {
     await prisma.instagramAccount.update({ where: { id: 'me' }, data: { keyword: 'SHOP' } });
     expect(await service.handle(comment('c1', 'u1', 'link'))).toBeNull();

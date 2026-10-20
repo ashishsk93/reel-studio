@@ -333,10 +333,21 @@ const STATUS_STYLE: Record<InstagramReplyDto["status"], string> = {
 };
 
 function ActivityCard() {
+  const queryClient = useQueryClient();
   const activity = useQuery({
     queryKey: instagramKeys.activity,
     queryFn: () => api.get<InstagramReplyDto[]>("/instagram/activity"),
     refetchInterval: 30_000,
+  });
+  const sendAnyway = useMutation({
+    mutationFn: (id: string) => api.post<{ status: "sent" | "failed" }>(`/instagram/replies/${id}/send`),
+    onSuccess: ({ status }) => {
+      if (status === "sent") toast.success("DM sent");
+      else toast.error("Instagram refused the DM; see the reason in the list");
+      void queryClient.invalidateQueries({ queryKey: instagramKeys.activity });
+      void queryClient.invalidateQueries({ queryKey: instagramKeys.reels });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
   });
   return (
     <Card title="Recent replies" description="Every comment the auto-replier answered or skipped.">
@@ -354,6 +365,17 @@ function ActivityCard() {
               </a>
             )}
             <span className="ml-auto text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
+            {(r.status === "skipped" || r.status === "failed") && (
+              <Button
+                size="xs"
+                variant="outline"
+                className="self-center"
+                onClick={() => sendAnyway.mutate(r.id)}
+                disabled={sendAnyway.isPending && sendAnyway.variables === r.id}
+              >
+                {sendAnyway.isPending && sendAnyway.variables === r.id && <Loader2 className="animate-spin" />} Send anyway
+              </Button>
+            )}
             {r.detail && <p className="w-full pl-16 text-xs text-muted-foreground">{r.detail}</p>}
           </li>
         ))}

@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PRIVATE_REPLY_WINDOW_MS, shouldReply } from './auto-reply';
@@ -73,30 +73,45 @@ export class AutoReplyService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
     if (already) return 'skipped';
+    return this.deliver(comment.id, rule.dmText, account.commentReply, comment.fromUsername ?? comment.fromId);
+  }
 
+  /** Manually DMs a comment the auto-replier skipped or failed on, with its Reel's current DM. */
+  async sendAnyway(replyId: string): Promise<'sent' | 'failed'> {
+    const row = await this.prisma.instagramReply.findUnique({ where: { id: replyId } });
+    if (!row) throw new NotFoundException('Reply not found');
+    if (row.status !== 'skipped' && row.status !== 'failed') throw new BadRequestException(`This comment was already ${row.status}.`);
+    const rule = row.mediaId ? await this.prisma.instagramRule.findUnique({ where: { mediaId: row.mediaId } }) : null;
+    if (!rule) throw new BadRequestException("This Reel has no DM any more; set one on the Instagram page first.");
+    const account = await this.instagram.account();
+    return this.deliver(row.sourceId, rule.dmText, account.commentReply, row.fromUsername ?? row.fromId);
+  }
+
+  /** Sends the private reply (and the public one when the DM went out) and records the outcome. */
+  private async deliver(commentId: string, dmText: string, commentReply: string | null, who: string): Promise<'sent' | 'failed'> {
     const { client } = await this.instagram.client();
     const problems: string[] = [];
     let sent = false;
     try {
-      await client.privateReply(comment.id, rule.dmText);
+      await client.privateReply(commentId, dmText);
       sent = true;
     } catch (error) {
       problems.push(error instanceof Error ? error.message : String(error));
       await this.instagram.recordError(error);
     }
     // "Sent you a DM" only makes sense when the DM went out.
-    if (sent && account.commentReply) {
+    if (sent && commentReply) {
       try {
-        await client.replyToComment(comment.id, account.commentReply);
+        await client.replyToComment(commentId, commentReply);
       } catch (error) {
         problems.push(`Public reply: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     await this.prisma.instagramReply.update({
-      where: { sourceId: comment.id },
+      where: { sourceId: commentId },
       data: { status: sent ? 'sent' : 'failed', detail: problems.length ? problems.join(' · ').slice(0, 500) : null },
     });
-    this.logger.log(`${sent ? 'Sent' : 'Failed'} DM to ${comment.fromUsername ?? comment.fromId}`);
+    this.logger.log(`${sent ? 'Sent' : 'Failed'} DM to ${who}`);
     return sent ? 'sent' : 'failed';
   }
 
