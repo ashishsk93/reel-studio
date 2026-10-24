@@ -9,6 +9,7 @@ import {
   InstructionSchema,
   SegmentComposeUpdateSchema,
   SegmentDetectionsSchema,
+  ShowTextAllSchema,
   type ComposeStepDto,
 } from '@reel/shared';
 import { ZodPipe } from '../common/zod';
@@ -39,6 +40,13 @@ export class ComposeController {
   @Put('segments/:id/compose')
   async updateSegment(@Param('id') id: string, @Body(new ZodPipe(SegmentComposeUpdateSchema)) body: z.output<typeof SegmentComposeUpdateSchema>) {
     return this.step(await this.compose.updateSegment(id, body));
+  }
+
+  /** On-screen text on or off for every scene at once. */
+  @Put('projects/:id/compose/text')
+  async showTextAll(@Param('id') id: string, @Body(new ZodPipe(ShowTextAllSchema)) body: z.output<typeof ShowTextAllSchema>) {
+    await this.compose.setShowTextAll(id, body.showText);
+    return this.step(id);
   }
 
   /** MediaPipe face / hand / person boxes from the browser. */

@@ -188,6 +188,7 @@ export class ComposeService implements OnModuleInit {
         sceneType: readJson(z.enum(SCENE_TYPES), s.scene.type, 'custom'),
         assetId: s.assetId,
         videoUrl: this.storage.url(s.asset.normalizedPath ?? s.asset.path)!,
+        showText: s.scene.showText,
         sourceWidth: s.asset.width,
         sourceHeight: s.asset.height,
         inSec: s.inSec,
@@ -225,7 +226,6 @@ export class ComposeService implements OnModuleInit {
       cover: extras.cover,
       captions: extras.captions,
       music: music ? { url: this.storage.url(music.path)!, name: music.name, durationSec: music.durationSec } : null,
-      showText: project.showText,
       totalSec: Math.round((segments.reduce((n, s) => n + (s.outSec - s.inSec), 0) + cta.durationSec) * 100) / 100,
       warnings,
     };
@@ -236,12 +236,11 @@ export class ComposeService implements OnModuleInit {
   /**
    * Full-frame text PNG for a segment, cached by content with its box in a sidecar; keeps
    * segment.textBox in sync. The text sits around 40 % height, moving below (or above) her
-   * face when detection shows they would overlap. Blank (no box) when the project has text off.
+   * face when detection shows they would overlap. Blank (no box) when the scene has text off.
    */
-  async textOverlay(segment: Segment, zone: SafeZone): Promise<{ rel: string; box: Box | null; warnings: string[] }> {
+  async textOverlay(segment: Segment & { scene: Pick<Scene, 'showText'> }, zone: SafeZone): Promise<{ rel: string; box: Box | null; warnings: string[] }> {
     const faces = this.detections(segment).faces;
-    const project = await this.prisma.project.findUnique({ where: { id: segment.projectId }, select: { showText: true } });
-    const text = project?.showText === false ? '' : segment.onScreenText;
+    const text = segment.scene.showText ? segment.onScreenText : '';
     const key = sha({ t: text, zone, faces, v: 3 });
     const rel = `projects/${segment.projectId}/overlays/${segment.id}/text-${key}.png`;
     const metaRel = `projects/${segment.projectId}/overlays/${segment.id}/text-${key}.json`;
@@ -344,8 +343,15 @@ export class ComposeService implements OnModuleInit {
       });
     }
     await this.prisma.segment.update({ where: { id: segmentId }, data: patch });
+    if (data.showText !== undefined) await this.prisma.scene.update({ where: { id: s.sceneId }, data: { showText: data.showText } });
     await this.recomputePlacements(s.projectId);
     return s.projectId;
+  }
+
+  /** On-screen text on or off for every scene of the project. */
+  async setShowTextAll(projectId: string, showText: boolean): Promise<void> {
+    await this.prisma.scene.updateMany({ where: { projectId }, data: { showText } });
+    await this.recomputePlacements(projectId);
   }
 
   /** MediaPipe boxes from the browser (source-normalised) → output frame; then garment details and placement. */

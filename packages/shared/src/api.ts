@@ -129,8 +129,6 @@ export interface ProjectSummaryDto {
   /** The project's name (classic: the product title); never shown in the Reel. */
   title: string;
   occasion: string;
-  /** Off: no scene gets on-screen text. */
-  showText: boolean;
   status: ProjectStatus;
   furthestStatus: ProjectStatus;
   influencer: { id: string; name: string; anchorUrl: string | null };
@@ -571,6 +569,8 @@ export interface ComposeSegmentDto {
   sceneType: SceneType;
   assetId: string;
   videoUrl: string;
+  /** The scene's on-screen text switch; off renders no text on it. */
+  showText: boolean;
   sourceWidth: number;
   sourceHeight: number;
   inSec: number;
@@ -628,8 +628,6 @@ export interface ComposeStepDto {
   cover: CoverDto;
   captions: CaptionPackageDto | null;
   music: { url: string; name: string; durationSec: number } | null;
-  /** The project's on-screen text switch; off renders no scene text. */
-  showText: boolean;
   /** Reel length: segments plus the CTA. */
   totalSec: number;
   warnings: string[];

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, PageHeader } from "@/components/page-header";
-import { InfluencerPicker, ShowTextField } from "@/components/projects/pickers";
+import { InfluencerPicker } from "@/components/projects/pickers";
 import { ProductImageDropzone, type PendingImage } from "@/components/projects/product-image-dropzone";
 import { FormatPicker, ProductFields, emptyProduct, type ProductDraft } from "@/components/projects/product-fields";
 import { ApiError, api, errorMessage } from "@/lib/api";
@@ -39,7 +39,7 @@ export default function NewProjectPage() {
   const sources = useSources();
 
   const [format, setFormat] = useState<StoryFormat>("classic");
-  const [form, setForm] = useState({ influencerId: "", title: "", occasion: "", showText: true });
+  const [form, setForm] = useState({ influencerId: "", title: "", occasion: "" });
   const [products, setProducts] = useState<ProductEntry[]>([{ key: 0, images: [], fields: emptyProduct() }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +91,6 @@ export default function NewProjectPage() {
       body.append("format", format);
       body.append("title", form.title);
       body.append("occasion", form.occasion);
-      body.append("showText", String(form.showText));
       body.append(
         "products",
         JSON.stringify(products.map((p) => ({ ...p.fields, priceModeOverride: p.fields.priceModeOverride ?? null, imageCount: p.images.length }))),
@@ -139,7 +138,6 @@ export default function NewProjectPage() {
               <FieldError message={errors.occasion} />
             </div>
           </div>
-          <ShowTextField value={form.showText} onChange={(showText) => setForm({ ...form, showText })} />
         </Section>
 
         {products.map((p, n) => (

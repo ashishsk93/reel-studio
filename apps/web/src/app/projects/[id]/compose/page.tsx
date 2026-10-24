@@ -33,11 +33,9 @@ export default function ComposePage() {
   const setData = (next: ComposeStepDto) => queryClient.setQueryData(key, next);
   const detecting = useAutoDetect(id, data, setData);
 
-  const showText = useMutation({
-    mutationFn: (on: boolean) => api.patch(`/projects/${id}`, { showText: on }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects", id] });
-    },
+  const showTextAll = useMutation({
+    mutationFn: (on: boolean) => api.put<ComposeStepDto>(`/projects/${id}/compose/text`, { showText: on }),
+    onSuccess: setData,
     onError: (e) => toast.error(errorMessage(e)),
   });
   const complete = useMutation({
@@ -77,8 +75,18 @@ export default function ComposePage() {
             <Loader2 className="animate-spin" /> {detecting}
           </Badge>
         )}
-        <label className="ml-auto flex items-center gap-2 text-sm" title="Off: no scene gets on-screen text, so nothing covers the outfit">
-          <Switch checked={data.showText} onCheckedChange={(v) => showText.mutate(v)} disabled={showText.isPending} /> On-screen text
+        <label className="ml-auto flex items-center gap-2 text-sm" title="Turn on-screen text on or off for every scene; each scene also has its own switch">
+          <Switch
+            checked={data.segments.some((s) => s.showText)}
+            onCheckedChange={(v) => showTextAll.mutate(v)}
+            disabled={showTextAll.isPending}
+          />{" "}
+          Text on all scenes
+          {data.segments.some((s) => s.showText) && data.segments.some((s) => !s.showText) && (
+            <span className="text-xs text-muted-foreground">
+              ({data.segments.filter((s) => s.showText).length}/{data.segments.length})
+            </span>
+          )}
         </label>
         <Button onClick={() => complete.mutate()} disabled={complete.isPending}>
           Export <ArrowRight />
@@ -164,7 +172,6 @@ function Overlays({ projectId, step, setData }: { projectId: string; step: Compo
           <SegmentRow
             key={s.id}
             segment={s}
-            showText={step.showText}
             active={s.id === seg.id}
             onSelect={() => setSelectedId(s.id)}
             setData={setData}
@@ -220,11 +227,9 @@ function SegmentRow({
   active,
   onSelect,
   setData,
-  showText,
   projectId,
 }: {
   segment: ComposeSegmentDto;
-  showText: boolean;
   active: boolean;
   onSelect: () => void;
   setData: (d: ComposeStepDto) => void;
@@ -299,8 +304,8 @@ function SegmentRow({
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         className="font-display font-semibold"
         placeholder="No on-screen text"
-        disabled={!showText}
-        title={showText ? undefined : "On-screen text is off for this Reel"}
+        disabled={!s.showText}
+        title={s.showText ? undefined : "On-screen text is off for this scene"}
       />
       {suggestOpen ? (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed p-2" onClick={(e) => e.stopPropagation()}>
@@ -336,7 +341,10 @@ function SegmentRow({
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
-        {!suggestOpen && showText && (
+        <label className="flex items-center gap-2">
+          <Switch checked={s.showText} onCheckedChange={(v) => update.mutate({ showText: v })} /> On-screen text
+        </label>
+        {!suggestOpen && s.showText && (
           <Button size="xs" variant="ghost" onClick={() => setSuggestOpen(true)}>
             <Sparkles /> New text
           </Button>

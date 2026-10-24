@@ -14,7 +14,7 @@ A 2–4 s CTA end card follows in every format. The ranges include it.
 
 ## Data model
 
-- **Project**: `format`, `title` (the project's name: "Kurtis under ₹499", "3 Diwali looks"; for classic it is the product title; never shown in the Reel), `showText` (off: no scene gets on-screen text), `occasion`, influencer, status. No product fields any more.
+- **Project**: `format`, `title` (the project's name: "Kurtis under ₹499", "3 Diwali looks"; for classic it is the product title; never shown in the Reel), `occasion`, influencer, status. No product fields any more.
 - **Product** (ordered, 1..N per project): title, store (`sourceId`), price and price-mode override, product URL, affiliate link, a short `note` shown on screen in hauls (e.g. "Cotton, 3 colours"). Has its own **ProductImage**s and **ProductSpec** (analysis, must-match list, garment paragraph).
 - **Scene**: `productId` (which product it shows; null for a hook that shows none). Prompts, attachments, reviews and badges all use the scene's product.
 - **VideoJob**: `endAssetId` for transitions (Kling start + end frame).
@@ -37,6 +37,6 @@ Existing projects migrate to `format = classic` with one product carrying their 
 - **Storyboard** gets every product's spec and paragraph, numbered; scenes carry `product` (1..N or null). Format rules are checked in code (one `try_on` per product, pairs in order, counts, durations).
 - **Image prompts** use the scene's product: its garment paragraph, its photos. A `transition_after` scene also attaches the approved `transition_before` image as the pose reference.
 - **Videos**: single-scene only for the new formats. `transition_before` scenes get no video job; `transition_after` jobs attach start + end frames and use the transition prompt.
-- **Compose**: the badge on each segment shows that segment's product (store logo + price). Hooks never get a badge.
+- **Compose**: the badge on each segment shows that segment's product (store logo + price). Hooks never get a badge. Each scene has its own on-screen text switch (off: no text over the outfit), plus one for all scenes.
 - **Captions**: hauls list every product with its price; the LINK DM lists every link, numbered; disclosure lines are the union of the stores'.
 - **QA**: the Reel-length check uses the format's range.

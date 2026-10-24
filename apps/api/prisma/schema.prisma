@@ -114,8 +114,6 @@ model Project {
   status          String    @default("draft")
   furthestStatus  String    @default("draft")
   videoMode       String    @default("multi_shot") // multi_shot | single (new projects are created as single)
-  /// Off: no scene gets an on-screen text overlay (the product stays uncovered).
-  showText        Boolean   @default(true)
   storyboardNotes Json? // string[] from the last storyboard generation
   postedAt        DateTime?
   createdAt       DateTime  @default(now())
@@ -204,6 +202,8 @@ model Scene {
   type              String
   purpose           String
   onScreenText      String
+  /// Off: this scene gets no on-screen text overlay (so it doesn't cover the outfit).
+  showText          Boolean  @default(true)
   targetDurationSec Float
   setting           String
   outfitState       String // own_clothes | wearing_product
