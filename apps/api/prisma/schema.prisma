@@ -92,7 +92,7 @@ model CreatorTask {
 
 model Source {
   id              String  @id @default(cuid())
-  key             String  @unique // amazon | myntra | meesho
+  key             String  @unique // SOURCES in packages/shared/src/sources.ts
   displayName     String
   logoPath        String?
   priceMode       String // exact | under_band | hidden

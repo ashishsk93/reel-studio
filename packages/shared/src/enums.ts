@@ -15,8 +15,8 @@ export const REF_TAGS = [
 ] as const;
 export type RefTag = (typeof REF_TAGS)[number];
 
-export const SOURCE_KEYS = ['amazon', 'myntra', 'meesho'] as const;
-export type SourceKey = (typeof SOURCE_KEYS)[number];
+// The store registry: SOURCES, SOURCE_KEYS, SourceKey, sourceForUrl.
+export * from './sources.js';
 
 export const PRICE_MODES = ['exact', 'under_band', 'hidden'] as const;
 export type PriceMode = (typeof PRICE_MODES)[number];

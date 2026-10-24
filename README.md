@@ -25,7 +25,7 @@ cd reel-studio
 pnpm i
 cp .env.example .env        # then fill in ANTHROPIC_API_KEY
 pnpm db:migrate             # creates data/app.db
-pnpm db:seed                # Aanya, Meera, and the Amazon / Myntra / Meesho sources
+pnpm db:seed                # Aanya, Meera, and the stores (Amazon / Myntra / Meesho / Savana)
 pnpm --filter @reel/web mediapipe   # face / pose / hand models for badge placement (public/mediapipe)
 pnpm dev                    # API on :4000, web on :3000
 ```

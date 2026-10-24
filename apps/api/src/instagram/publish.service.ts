@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
-import { InstagramPublishSchema, type InstagramPostDto, type InstagramProjectDto, type JobDto } from '@reel/shared';
+import { InstagramPublishSchema, sourceDefinition, type InstagramPostDto, type InstagramProjectDto, type JobDto } from '@reel/shared';
 import type { InstagramPost } from '../generated/prisma/client';
 import { parseOrThrow } from '../common/zod';
 import { JobsService } from '../jobs/jobs.service';
@@ -81,7 +81,7 @@ export class PublishService implements OnModuleInit {
         dmText: captions?.dmTemplate ?? '',
         keyword: status.keyword,
       },
-      otherAppReplies: products.some((p) => p.source.key === 'meesho'),
+      otherAppReplies: products.some((p) => sourceDefinition(p.source.key)?.appSendsDmLink === true),
     };
   }
 

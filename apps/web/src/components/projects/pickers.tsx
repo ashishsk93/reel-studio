@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { PRICE_MODES, priceLabel, type InfluencerDto, type PriceMode, type SourceDto } from "@reel/shared";
+import { PRICE_MODES, priceLabel, sourceDefinition, type InfluencerDto, type PriceMode, type SourceDto } from "@reel/shared";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +69,26 @@ export function InfluencerPicker({
   );
 }
 
+/** The uploaded store logo, or a monogram in the store's colour until one is uploaded. */
+export function SourceLogo({ source, className }: { source: Pick<SourceDto, "key" | "displayName" | "logoUrl">; className?: string }) {
+  if (source.logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={source.logoUrl} alt={source.displayName} className={cn("max-h-8 max-w-[80%] object-contain", className)} />;
+  }
+  return (
+    <span className="flex min-w-0 max-w-full items-center gap-1.5 font-display text-sm font-semibold">
+      <span
+        className="flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white ring-1 ring-white/25"
+        style={{ backgroundColor: sourceDefinition(source.key)?.brandColor ?? "#6b7280" }}
+        aria-hidden
+      >
+        {source.displayName.charAt(0)}
+      </span>
+      <span className="truncate">{source.displayName}</span>
+    </span>
+  );
+}
+
 export function SourcePicker({
   sources,
   value,
@@ -79,7 +99,7 @@ export function SourcePicker({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {sources.map((s) => {
         const selected = s.id === value;
         return (
@@ -92,12 +112,7 @@ export function SourcePicker({
               selected ? "border-primary ring-2 ring-primary/40" : "hover:border-primary/50",
             )}
           >
-            {s.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.logoUrl} alt={s.displayName} className="max-h-8 max-w-[80%] object-contain" />
-            ) : (
-              <span className="font-display font-semibold">{s.displayName}</span>
-            )}
+            <SourceLogo source={s} />
             <span className="text-[11px] text-muted-foreground">
               {s.priceMode === "under_band" ? "Under-₹X band" : s.priceMode === "hidden" ? "Logo only" : "Exact price"}
             </span>

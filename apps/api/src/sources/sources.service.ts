@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
-import { PRICE_MODES, SOURCE_KEYS, type SourceDto, type SourceUpdate } from '@reel/shared';
+import { PRICE_MODES, SOURCES, SOURCE_KEYS, type SourceDto, type SourceUpdate } from '@reel/shared';
 import type { Source } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,11 +8,25 @@ import { StorageService } from '../storage/storage.service';
 import { inspectImage } from '../storage/uploads';
 
 @Injectable()
-export class SourcesService {
+export class SourcesService implements OnModuleInit {
+  private readonly log = new Logger(SourcesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
   ) {}
+
+  /** Creates a row for each store in the registry that has none yet; existing rows keep their edits. */
+  async onModuleInit(): Promise<void> {
+    const existing = new Set((await this.prisma.source.findMany({ select: { key: true } })).map((r) => r.key));
+    for (const s of SOURCES) {
+      if (existing.has(s.key)) continue;
+      await this.prisma.source.create({
+        data: { key: s.key, displayName: s.displayName, priceMode: s.priceMode, disclosureLines: toJson([...s.disclosureLines]), linkNotes: s.linkNotes },
+      });
+      this.log.log(`Added store ${s.displayName}`);
+    }
+  }
 
   async list(): Promise<SourceDto[]> {
     const rows = await this.prisma.source.findMany();

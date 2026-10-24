@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Clapperboard, Gift, Shirt, ShoppingBag, Sparkles } from "lucide-react";
-import { FORMATS, STORY_FORMATS, type PriceMode, type ProductDto, type SourceDto, type StoryFormat } from "@reel/shared";
+import { FORMATS, STORY_FORMATS, sourceForUrl, type PriceMode, type ProductDto, type SourceDto, type StoryFormat } from "@reel/shared";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/page-header";
@@ -56,6 +56,20 @@ export function ProductFields({
   showNote?: boolean;
 }) {
   const set = <K extends keyof ProductDraft>(key: K, v: ProductDraft[K]) => onChange({ ...value, [key]: v });
+  // A pasted store link picks the store; a link to another store's site is flagged.
+  const setLink = (key: "productUrl" | "affiliateLink", url: string) => {
+    const match = sources.find((s) => s.key === sourceForUrl(url));
+    onChange({ ...value, [key]: url, ...(match ? { sourceId: match.id } : {}) });
+  };
+  const selected = sources.find((s) => s.id === value.sourceId);
+  const linkStore = (url: string) => {
+    const s = sources.find((x) => x.key === sourceForUrl(url));
+    return s && selected && s.id !== selected.id ? s : null;
+  };
+  const linkWarning = (url: string) => {
+    const s = linkStore(url);
+    return s ? `This is a ${s.displayName} link, but the store is ${selected?.displayName}.` : undefined;
+  };
   return (
     <div className="flex flex-col gap-4">
       <div className={cn("grid gap-4", showNote && "md:grid-cols-2")}>
@@ -87,7 +101,7 @@ export function ProductFields({
           <Label className="mb-1.5 block">Price on the badge</Label>
           <PriceModeField
             price={Number(value.priceInr) || 0}
-            source={sources.find((s) => s.id === value.sourceId)}
+            source={selected}
             override={value.priceModeOverride}
             onOverride={(mode) => set("priceModeOverride", mode)}
           />
@@ -96,13 +110,13 @@ export function ProductFields({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Product URL (optional)</Label>
-          <Input value={value.productUrl} onChange={(e) => set("productUrl", e.target.value)} placeholder="https://" />
-          <FieldError message={errors.productUrl} />
+          <Input value={value.productUrl} onChange={(e) => setLink("productUrl", e.target.value)} placeholder="https://" />
+          <FieldError message={errors.productUrl ?? linkWarning(value.productUrl)} />
         </div>
         <div>
           <Label className="mb-1.5 block">Affiliate link (optional)</Label>
-          <Input value={value.affiliateLink} onChange={(e) => set("affiliateLink", e.target.value)} placeholder="https://" />
-          <FieldError message={errors.affiliateLink} />
+          <Input value={value.affiliateLink} onChange={(e) => setLink("affiliateLink", e.target.value)} placeholder="https://" />
+          <FieldError message={errors.affiliateLink ?? linkWarning(value.affiliateLink)} />
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImageUp, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PRICE_MODES, priceLabel, type PriceMode, type SourceDto } from "@reel/shared";
+import { PRICE_MODES, SOURCES, priceLabel, type PriceMode, type SourceDto } from "@reel/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +40,7 @@ export default function SourcesPage() {
       {error && <ErrorState error={error} />}
       <div className="grid gap-6 lg:grid-cols-3">
         {isPending
-          ? Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-[520px] rounded-xl" />)
+          ? Array.from({ length: SOURCES.length }, (_, i) => <Skeleton key={i} className="h-[520px] rounded-xl" />)
           : data?.map((source) => <SourceCard key={source.id} source={source} />)}
       </div>
     </>
