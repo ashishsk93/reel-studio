@@ -100,6 +100,7 @@ export function toProjectSummaryDto(p: ProjectWithRelations, storage: StorageSer
     format: readJson(z.enum(STORY_FORMATS), p.format, 'classic'),
     title: p.title,
     occasion: p.occasion,
+    showText: p.showText,
     status: readJson(status, p.status, 'draft'),
     furthestStatus: readJson(status, p.furthestStatus, 'draft'),
     influencer: { id: p.influencer.id, name: p.influencer.name, anchorUrl: storage.url(anchor?.path) },

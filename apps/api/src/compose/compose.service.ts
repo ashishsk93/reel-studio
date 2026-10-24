@@ -225,6 +225,7 @@ export class ComposeService implements OnModuleInit {
       cover: extras.cover,
       captions: extras.captions,
       music: music ? { url: this.storage.url(music.path)!, name: music.name, durationSec: music.durationSec } : null,
+      showText: project.showText,
       totalSec: Math.round((segments.reduce((n, s) => n + (s.outSec - s.inSec), 0) + cta.durationSec) * 100) / 100,
       warnings,
     };
@@ -235,21 +236,23 @@ export class ComposeService implements OnModuleInit {
   /**
    * Full-frame text PNG for a segment, cached by content with its box in a sidecar; keeps
    * segment.textBox in sync. The text sits around 40 % height, moving below (or above) her
-   * face when detection shows they would overlap.
+   * face when detection shows they would overlap. Blank (no box) when the project has text off.
    */
   async textOverlay(segment: Segment, zone: SafeZone): Promise<{ rel: string; box: Box | null; warnings: string[] }> {
     const faces = this.detections(segment).faces;
-    const key = sha({ t: segment.onScreenText, zone, faces, v: 3 });
+    const project = await this.prisma.project.findUnique({ where: { id: segment.projectId }, select: { showText: true } });
+    const text = project?.showText === false ? '' : segment.onScreenText;
+    const key = sha({ t: text, zone, faces, v: 3 });
     const rel = `projects/${segment.projectId}/overlays/${segment.id}/text-${key}.png`;
     const metaRel = `projects/${segment.projectId}/overlays/${segment.id}/text-${key}.json`;
     let meta: { box: Box | null; warnings: string[] };
     if (await this.storage.exists(metaRel)) {
       meta = JSON.parse(await fs.readFile(this.storage.abs(metaRel), 'utf8')) as typeof meta;
     } else {
-      let out = renderTextOverlay(segment.onScreenText, zone);
+      let out = renderTextOverlay(text, zone);
       for (const centerY of [0.58, 0.66, 0.3]) {
         if (!out.box || !faces.some((f) => boxesOverlap(out.box!, f))) break;
-        const next = renderTextOverlay(segment.onScreenText, zone, centerY);
+        const next = renderTextOverlay(text, zone, centerY);
         if (next.box && !faces.some((f) => boxesOverlap(next.box!, f))) out = next;
       }
       await this.storage.writeAtomic(rel, out.png);

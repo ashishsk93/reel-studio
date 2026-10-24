@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { PRICE_MODES, priceLabel, sourceDefinition, type InfluencerDto, type PriceMode, type SourceDto } from "@reel/shared";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -176,5 +177,18 @@ export function PriceModeField({
         )}
       </p>
     </div>
+  );
+}
+
+/** The project's on-screen text switch (off: no scene gets text over the outfit). */
+export function ShowTextField({ value, onChange }: { value: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-3 text-sm">
+      <Switch checked={value} onCheckedChange={onChange} className="mt-0.5" />
+      <span>
+        On-screen text
+        <span className="block text-xs text-muted-foreground">Off: no scene shows text, so nothing covers the outfit. You can change this on the Compose step.</span>
+      </span>
+    </label>
   );
 }

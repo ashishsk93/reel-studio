@@ -14,7 +14,7 @@ A 2–4 s CTA end card follows in every format. The ranges include it.
 
 ## Data model
 
-- **Project**: `format`, `title` (the Reel's headline: "Kurtis under ₹499", "3 Diwali looks"; for classic it is the product title), `occasion`, influencer, status. No product fields any more.
+- **Project**: `format`, `title` (the project's name: "Kurtis under ₹499", "3 Diwali looks"; for classic it is the product title; never shown in the Reel), `showText` (off: no scene gets on-screen text), `occasion`, influencer, status. No product fields any more.
 - **Product** (ordered, 1..N per project): title, store (`sourceId`), price and price-mode override, product URL, affiliate link, a short `note` shown on screen in hauls (e.g. "Cotton, 3 colours"). Has its own **ProductImage**s and **ProductSpec** (analysis, must-match list, garment paragraph).
 - **Scene**: `productId` (which product it shows; null for a hook that shows none). Prompts, attachments, reviews and badges all use the scene's product.
 - **VideoJob**: `endAssetId` for transitions (Kling start + end frame).
@@ -25,7 +25,7 @@ Existing projects migrate to `format = classic` with one product carrying their 
 
 | Type | Outfit | Product | Notes |
 |---|---|---|---|
-| `hook` | own clothes, or wearing product 1 | none or product 1 | Opens a multi-product Reel; the on-screen text is the title. No badge. |
+| `hook` | own clothes, or wearing product 1 | none or product 1 | Opens a multi-product Reel; its on-screen text is a generated hook line (not the project title). No badge. |
 | `try_on` | wearing | that product | 2–3 s, full body or three-quarter, candid. Badge with that product's price; the on-screen text is a short line about it. |
 | `styled` | wearing | the product | Same piece styled for a different occasion (accessories, setting, drape). Garment unchanged. |
 | `transition_before` | own clothes | that product (for reference) | Image only: the start frame of the next scene's video. No segment of its own. |

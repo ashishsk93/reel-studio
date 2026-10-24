@@ -65,7 +65,7 @@ export class ProjectsService {
 
       // Single-scene videos: Kling 3.0 only takes a start frame, so every scene starts from its own still.
       const project = await this.prisma.project.create({
-        data: { influencerId: data.influencerId, format: data.format, title: data.title, occasion: data.occasion, videoMode: 'single' },
+        data: { influencerId: data.influencerId, format: data.format, title: data.title, occasion: data.occasion, showText: data.showText, videoMode: 'single' },
       });
       let offset = 0;
       for (const [order, p] of data.products.entries()) {

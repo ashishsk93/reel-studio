@@ -183,7 +183,7 @@ export class CoverCaptionsService implements OnModuleInit {
         {
           type: 'text',
           text: [
-            `Reel title: ${project.title}`,
+            `Project title (its name only, never on-screen text): ${project.title}`,
             product ? `Product in this scene: ${product.title}${product.note ? ` (${product.note})` : ''}` : 'This scene shows no product.',
             `Occasion: ${project.occasion}`,
             '',

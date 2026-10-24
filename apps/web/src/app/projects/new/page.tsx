@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, PageHeader } from "@/components/page-header";
-import { InfluencerPicker } from "@/components/projects/pickers";
+import { InfluencerPicker, ShowTextField } from "@/components/projects/pickers";
 import { ProductImageDropzone, type PendingImage } from "@/components/projects/product-image-dropzone";
 import { FormatPicker, ProductFields, emptyProduct, type ProductDraft } from "@/components/projects/product-fields";
 import { ApiError, api, errorMessage } from "@/lib/api";
@@ -39,7 +39,7 @@ export default function NewProjectPage() {
   const sources = useSources();
 
   const [format, setFormat] = useState<StoryFormat>("classic");
-  const [form, setForm] = useState({ influencerId: "", title: "", occasion: "" });
+  const [form, setForm] = useState({ influencerId: "", title: "", occasion: "", showText: true });
   const [products, setProducts] = useState<ProductEntry[]>([{ key: 0, images: [], fields: emptyProduct() }]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +91,7 @@ export default function NewProjectPage() {
       body.append("format", format);
       body.append("title", form.title);
       body.append("occasion", form.occasion);
+      body.append("showText", String(form.showText));
       body.append(
         "products",
         JSON.stringify(products.map((p) => ({ ...p.fields, priceModeOverride: p.fields.priceModeOverride ?? null, imageCount: p.images.length }))),
@@ -125,10 +126,10 @@ export default function NewProjectPage() {
           <FormatPicker value={format} onChange={pickFormat} />
         </Section>
 
-        <Section title="The Reel" hint={rule.titleOnScreen ? "The title opens the Reel as on-screen text." : undefined}>
+        <Section title="The Reel" hint="The title is the project's name; it isn't shown in the Reel.">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label className="mb-1.5 block">{multi || rule.titleOnScreen ? "Title" : "Product title"}</Label>
+              <Label className="mb-1.5 block">{format === "classic" ? "Product title" : "Title"}</Label>
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={rule.titleExample} />
               <FieldError message={errors.title} />
             </div>
@@ -138,6 +139,7 @@ export default function NewProjectPage() {
               <FieldError message={errors.occasion} />
             </div>
           </div>
+          <ShowTextField value={form.showText} onChange={(showText) => setForm({ ...form, showText })} />
         </Section>
 
         {products.map((p, n) => (

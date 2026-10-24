@@ -624,7 +624,7 @@ export class StoryboardService implements OnModuleInit {
     return [
       '## The Reel',
       `Format: ${rule.label} (${ctx.format})`,
-      `Title: ${ctx.title}${rule.titleOnScreen ? ' (the hook shows it as its on-screen text, word for word)' : ''}`,
+      `Project title (its name only, never on-screen text): ${ctx.title}`,
       `Occasion / mood: ${ctx.occasion}`,
     ].join('\n');
   }

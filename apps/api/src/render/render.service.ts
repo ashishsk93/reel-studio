@@ -91,7 +91,7 @@ export class RenderService implements OnModuleInit {
         input: this.storage.abs(s.asset.normalizedPath),
         inSec: s.inSec,
         durationSec: Math.round((s.outSec - s.inSec) * 1000) / 1000,
-        textPng: s.onScreenText.trim() ? this.storage.abs(text.rel) : null,
+        textPng: text.box ? this.storage.abs(text.rel) : null,
         badge:
           s.badgeEnabled && placement && badge
             ? { png: this.storage.abs(badge.rel), x: placement.x, y: placement.y, w: badge.w * placement.scale, h: badge.h * placement.scale }

@@ -126,9 +126,11 @@ export interface ProductDto {
 export interface ProjectSummaryDto {
   id: string;
   format: StoryFormat;
-  /** The Reel's headline (classic: the product title). */
+  /** The project's name (classic: the product title); never shown in the Reel. */
   title: string;
   occasion: string;
+  /** Off: no scene gets on-screen text. */
+  showText: boolean;
   status: ProjectStatus;
   furthestStatus: ProjectStatus;
   influencer: { id: string; name: string; anchorUrl: string | null };
@@ -626,6 +628,8 @@ export interface ComposeStepDto {
   cover: CoverDto;
   captions: CaptionPackageDto | null;
   music: { url: string; name: string; durationSec: number } | null;
+  /** The project's on-screen text switch; off renders no scene text. */
+  showText: boolean;
   /** Reel length: segments plus the CTA. */
   totalSec: number;
   warnings: string[];

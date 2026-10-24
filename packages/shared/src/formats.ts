@@ -11,8 +11,6 @@ export interface FormatRule {
   reelSec: { min: number; max: number };
   /** Scene types the storyboard may use. */
   sceneTypes: readonly SceneType[];
-  /** The headline is shown as on-screen text on the hook (multi-product formats). */
-  titleOnScreen: boolean;
 }
 
 /** Story formats (docs/formats.md). */
@@ -24,7 +22,6 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     products: { min: 1, max: 1 },
     reelSec: { min: 16, max: 20 },
     sceneTypes: ['unboxing', 'hold_up', 'pieces', 'detail', 'wearing_front', 'wearing_alt', 'custom'],
-    titleOnScreen: false,
   },
   haul: {
     label: 'Price-cap haul',
@@ -33,7 +30,6 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     products: { min: 2, max: 5 },
     reelSec: { min: 10, max: 20 },
     sceneTypes: ['hook', 'try_on'],
-    titleOnScreen: true,
   },
   occasion: {
     label: 'Occasion edit',
@@ -42,7 +38,6 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     products: { min: 2, max: 5 },
     reelSec: { min: 10, max: 20 },
     sceneTypes: ['hook', 'try_on'],
-    titleOnScreen: true,
   },
   transition: {
     label: 'Outfit transition',
@@ -51,7 +46,6 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     products: { min: 1, max: 3 },
     reelSec: { min: 10, max: 20 },
     sceneTypes: ['hook', 'transition_before', 'transition_after'],
-    titleOnScreen: true,
   },
   three_ways: {
     label: 'One piece, 3 ways',
@@ -60,7 +54,6 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     products: { min: 1, max: 1 },
     reelSec: { min: 14, max: 20 },
     sceneTypes: ['hook', 'styled'],
-    titleOnScreen: true,
   },
 };
 

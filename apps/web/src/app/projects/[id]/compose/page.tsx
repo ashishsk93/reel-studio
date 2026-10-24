@@ -33,6 +33,13 @@ export default function ComposePage() {
   const setData = (next: ComposeStepDto) => queryClient.setQueryData(key, next);
   const detecting = useAutoDetect(id, data, setData);
 
+  const showText = useMutation({
+    mutationFn: (on: boolean) => api.patch(`/projects/${id}`, { showText: on }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects", id] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
   const complete = useMutation({
     mutationFn: () => api.post(`/projects/${id}/compose/complete`),
     onSuccess: async () => {
@@ -70,7 +77,10 @@ export default function ComposePage() {
             <Loader2 className="animate-spin" /> {detecting}
           </Badge>
         )}
-        <Button className="ml-auto" onClick={() => complete.mutate()} disabled={complete.isPending}>
+        <label className="ml-auto flex items-center gap-2 text-sm" title="Off: no scene gets on-screen text, so nothing covers the outfit">
+          <Switch checked={data.showText} onCheckedChange={(v) => showText.mutate(v)} disabled={showText.isPending} /> On-screen text
+        </label>
+        <Button onClick={() => complete.mutate()} disabled={complete.isPending}>
           Export <ArrowRight />
         </Button>
       </div>
@@ -151,7 +161,15 @@ function Overlays({ projectId, step, setData }: { projectId: string; step: Compo
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <ol className="flex flex-col gap-2">
         {step.segments.map((s) => (
-          <SegmentRow key={s.id} segment={s} active={s.id === seg.id} onSelect={() => setSelectedId(s.id)} setData={setData} projectId={projectId} />
+          <SegmentRow
+            key={s.id}
+            segment={s}
+            showText={step.showText}
+            active={s.id === seg.id}
+            onSelect={() => setSelectedId(s.id)}
+            setData={setData}
+            projectId={projectId}
+          />
         ))}
       </ol>
       <aside className="flex flex-col items-center gap-3 self-start lg:sticky lg:top-4">
@@ -202,9 +220,11 @@ function SegmentRow({
   active,
   onSelect,
   setData,
+  showText,
   projectId,
 }: {
   segment: ComposeSegmentDto;
+  showText: boolean;
   active: boolean;
   onSelect: () => void;
   setData: (d: ComposeStepDto) => void;
@@ -279,6 +299,8 @@ function SegmentRow({
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         className="font-display font-semibold"
         placeholder="No on-screen text"
+        disabled={!showText}
+        title={showText ? undefined : "On-screen text is off for this Reel"}
       />
       {suggestOpen ? (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed p-2" onClick={(e) => e.stopPropagation()}>
@@ -314,7 +336,7 @@ function SegmentRow({
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
-        {!suggestOpen && (
+        {!suggestOpen && showText && (
           <Button size="xs" variant="ghost" onClick={() => setSuggestOpen(true)}>
             <Sparkles /> New text
           </Button>

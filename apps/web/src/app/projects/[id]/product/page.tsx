@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FieldError } from "@/components/page-header";
-import { InfluencerPicker } from "@/components/projects/pickers";
+import { InfluencerPicker, ShowTextField } from "@/components/projects/pickers";
 import { ProductImageDropzone, RoleSelect, type PendingImage } from "@/components/projects/product-image-dropzone";
 import { FORMAT_ICON, ProductFields, emptyProduct, productDraft, productRange, type ProductDraft } from "@/components/projects/product-fields";
 import { ApiError, api, errorMessage } from "@/lib/api";
@@ -55,7 +55,7 @@ function DetailsCard({ project }: { project: ProjectDto }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const influencers = useInfluencers();
-  const pick = (p: ProjectDto) => ({ influencerId: p.influencer.id, title: p.title, occasion: p.occasion });
+  const pick = (p: ProjectDto) => ({ influencerId: p.influencer.id, title: p.title, occasion: p.occasion, showText: p.showText });
   const [form, setForm] = useSyncedState(project, () => pick(project));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const dirty = JSON.stringify(form) !== JSON.stringify(pick(project));
@@ -94,7 +94,7 @@ function DetailsCard({ project }: { project: ProjectDto }) {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <Label className="mb-1.5 block">{rule.titleOnScreen || rule.products.max > 1 ? "Title" : "Product title"}</Label>
+          <Label className="mb-1.5 block">{project.format === "classic" ? "Product title" : "Title"}</Label>
           <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={rule.titleExample} />
           <FieldError message={errors.title} />
         </div>
@@ -103,6 +103,9 @@ function DetailsCard({ project }: { project: ProjectDto }) {
           <Input value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} />
           <FieldError message={errors.occasion} />
         </div>
+      </div>
+      <div className="mt-5">
+        <ShowTextField value={form.showText} onChange={(showText) => setForm({ ...form, showText })} />
       </div>
       <div className="mt-5">
         <Label className="mb-1.5 block">Influencer</Label>

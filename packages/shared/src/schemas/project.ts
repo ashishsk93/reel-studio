@@ -41,6 +41,8 @@ export const ProjectFieldsSchema = z.object({
   format: z.enum(STORY_FORMATS).default('classic'),
   title: z.string().trim().min(1, 'Required'),
   occasion: z.string().trim().min(1, 'Required, e.g. "Diwali party"'),
+  /** Off: no scene gets on-screen text. */
+  showText: z.boolean().default(true),
 });
 export type ProjectFields = z.input<typeof ProjectFieldsSchema>;
 
@@ -80,6 +82,7 @@ const rolesField = z
  * `images` files in product order with `roles` (JSON array, one per file).
  */
 export const ProjectCreateFieldsSchema = ProjectFieldsSchema.extend({
+  showText: z.stringbool().default(true),
   products: jsonField(z.array(ProductFieldsSchema.extend({ imageCount: z.number().int().min(1, 'Add at least one photo') })).min(1), 'products'),
   roles: rolesField,
 }).superRefine((data, ctx) => {
@@ -94,8 +97,8 @@ export const ProjectCreateFieldsSchema = ProjectFieldsSchema.extend({
 /** Multipart add-product: the product fields plus its photos and their `roles`. */
 export const ProductCreateFieldsSchema = ProductFieldsSchema.extend({ roles: rolesField });
 
-/** No default format here: a partial update must never reset it to classic. */
-export const ProjectUpdateSchema = ProjectFieldsSchema.extend({ format: z.enum(STORY_FORMATS) }).partial();
+/** No defaults here: a partial update must never reset the format to classic or turn text back on. */
+export const ProjectUpdateSchema = ProjectFieldsSchema.extend({ format: z.enum(STORY_FORMATS), showText: z.boolean() }).partial();
 export type ProjectUpdate = z.output<typeof ProjectUpdateSchema>;
 
 export const ProjectGotoSchema = z.object({ status: z.enum(PROJECT_STATUSES) });
