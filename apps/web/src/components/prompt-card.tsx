@@ -22,6 +22,7 @@ export function PromptCard({
   /** Smaller thumbnails and prompt box, for fixes and assistant answers. */
   compact?: boolean;
 }) {
+  const images = card.attachments.filter((x) => x.url && x.kind !== "video");
   return (
     <div className="overflow-hidden rounded-xl border bg-card" data-copy-target>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
@@ -47,10 +48,12 @@ export function PromptCard({
           {card.attachments.map((a) => (
             <li key={`${a.index}-${a.id}`} className={compact ? "w-16" : "w-28"}>
               <div className="relative aspect-[9/16] overflow-hidden rounded-lg border bg-muted">
-                {a.url ? (
+                {a.url && a.kind === "video" ? (
+                  <video src={a.url} controls muted playsInline className="size-full object-cover" />
+                ) : a.url ? (
                   <Expandable
-                    items={card.attachments.filter((x) => x.url).map((x) => ({ url: x.url!, label: `${x.index}. ${x.label}` }))}
-                    index={card.attachments.filter((x) => x.url).findIndex((x) => x.id === a.id && x.index === a.index)}
+                    items={images.map((x) => ({ url: x.url!, label: `${x.index}. ${x.label}` }))}
+                    index={images.findIndex((x) => x.id === a.id && x.index === a.index)}
                     className="size-full"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -87,7 +87,7 @@ export function JobCard({ job, projectId, compact }: { job: VideoJobDto; project
           card={job.card}
           chips={
             <>
-              <Badge>Kling 3.0</Badge>
+              <Badge>{job.motionTransfer ? "Motion transfer" : "Kling 3.0"}</Badge>
               <Badge variant="secondary">{job.durationSec}s</Badge>
               <Badge variant="secondary">{job.settings.resolution}</Badge>
               <Badge variant="secondary">Sound {job.settings.sound ? "on" : "off"}</Badge>

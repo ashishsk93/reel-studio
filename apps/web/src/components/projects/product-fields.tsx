@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clapperboard, Gift, Shirt, ShoppingBag, Sparkles } from "lucide-react";
+import { Check, Clapperboard, Gift, Music, Shirt, ShoppingBag, Sparkles } from "lucide-react";
 import { FORMATS, STORY_FORMATS, sourceForUrl, type PriceMode, type ProductDto, type SourceDto, type StoryFormat } from "@reel/shared";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,6 +129,7 @@ export const FORMAT_ICON: Record<StoryFormat, typeof Gift> = {
   occasion: Sparkles,
   transition: Clapperboard,
   three_ways: Shirt,
+  dance: Music,
 };
 
 export function productRange(format: StoryFormat): string {

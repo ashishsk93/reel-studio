@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/page-header";
 import { JobCard } from "@/components/video/job-card";
+import { ReferenceVideoPanel } from "@/components/video/reference-video-panel";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { useJobRefresh } from "@/lib/jobs";
 import { projectKeys, useImagesStep, useProject, useVideoStep } from "@/lib/queries";
@@ -62,6 +63,7 @@ export default function VideoPromptsPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {project?.format === "dance" && <ReferenceVideoPanel project={project} />}
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-3">
         <div className="flex rounded-lg border p-0.5">
           {modes.map((m) => (

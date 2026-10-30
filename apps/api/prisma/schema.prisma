@@ -115,6 +115,7 @@ model Project {
   furthestStatus  String    @default("draft")
   videoMode       String    @default("multi_shot") // multi_shot | single (new projects are created as single)
   storyboardNotes Json? // string[] from the last storyboard generation
+  referenceVideo  Json? // dance format: { path, name, durationSec, width, height }
   postedAt        DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

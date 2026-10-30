@@ -55,10 +55,27 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
     reelSec: { min: 14, max: 20 },
     sceneTypes: ['hook', 'styled'],
   },
+  dance: {
+    label: 'Dance (motion transfer)',
+    description: 'One dress, 1–3 backgrounds: she performs the moves of a reference clip (Kling Motion Control or Higgsfield Genjutsu).',
+    titleExample: 'Red satin dress, rooftop dance',
+    products: { min: 1, max: 1 },
+    reelSec: { min: 10, max: 30 },
+    sceneTypes: ['dance'],
+  },
 };
 
 /** Scene types that become their own Reel segment (a transition's "before" is only a start frame). */
 export function hasSegment(type: SceneType): boolean {
   return type !== 'transition_before';
 }
+
+/** Dance Reels sell nothing: no on-screen text, badge, end card, link or DM; the caption carries this follow ask. */
+export const DANCE_CTA = 'Follow for more 💃';
+
+/** Her age floor for the dance format, whose images aim for a glamorous, alluring look. */
+export const DANCE_MIN_AGE = 21;
+
+/** Reference clip limits both tools accept: Genjutsu takes 4–30 s, Kling Motion Control 3–30 s and up to 100 MB. */
+export const REFERENCE_VIDEO = { minSec: 4, maxSec: 30, maxBytes: 100 * 1024 * 1024 } as const;
 

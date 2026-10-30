@@ -75,7 +75,7 @@ export interface InfluencerDetailDto extends InfluencerDto {
 export interface AttachmentDto {
   index: number;
   label: string;
-  kind: 'reference' | 'product' | 'asset';
+  kind: 'reference' | 'product' | 'asset' | 'video';
   id: string;
   url: string | null;
   fileName: string;
@@ -144,8 +144,18 @@ export interface ProjectSummaryDto {
   postedAt: string | null;
 }
 
+export interface ReferenceVideoDto {
+  url: string;
+  name: string;
+  durationSec: number;
+  width: number;
+  height: number;
+}
+
 export interface ProjectDto extends ProjectSummaryDto {
   videoMode: VideoMode;
+  /** The clip whose moves she performs (dance format). */
+  referenceVideo: ReferenceVideoDto | null;
   products: ProductDto[];
 }
 
@@ -498,6 +508,8 @@ export interface VideoAssetDto {
 export interface VideoJobDto {
   id: string;
   mode: VideoMode;
+  /** Generated with Kling Motion Control or Genjutsu from a reference clip, not image-to-video. */
+  motionTransfer: boolean;
   purpose: VideoJobPurpose;
   order: number;
   active: boolean;

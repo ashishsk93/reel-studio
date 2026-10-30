@@ -156,6 +156,9 @@ export class AssetContextService {
         : `She should be in her own clothes (${inf.homeOutfit})${scene.showsProduct ? ', holding or showing the product' : ''}.`,
       `Product in frame: ${productInFrame ? 'yes' : 'no'}`,
       `Scene: ${scene.description}`,
+      ...(project.format === 'dance'
+        ? ['This is a dance Reel: the outfit is deliberately restyled from the product, and nothing is on sale. Judge only its colour, print and overall style against the product images; ignore the must-match list. A changed neckline or waist is expected.']
+        : []),
       `On-screen text "${scene.onScreenText}" is added later as an overlay; the image itself must have no text.`,
       '',
       'The prompt that was used:',
@@ -176,8 +179,8 @@ export class AssetContextService {
       contextBlocks: [personaBlock(inf), ...(spec ? [productBlock(spec)] : [])],
       ownerText,
       compareImages: compare.map((c): LlmPart => ({ type: 'image', path: c.path, label: c.label })),
-      mustMatch: spec?.mustMatch ?? [],
-      mustMatchKeys: productInFrame && spec ? spec.mustMatch.map((m) => m.key) : [],
+      mustMatch: project.format === 'dance' ? [] : (spec?.mustMatch ?? []),
+      mustMatchKeys: project.format !== 'dance' && productInFrame && spec ? spec.mustMatch.map((m) => m.key) : [],
       expectedAspect: '9:16',
       checkFaceZone: true,
     };

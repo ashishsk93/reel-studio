@@ -1,4 +1,4 @@
-import { hasPlaceholder, type ConditionalFeature, type OutfitState } from '@reel/shared';
+import { hasPlaceholder, type ConditionalFeature, type OutfitState, type SceneType } from '@reel/shared';
 import type { PromptService } from '../llm/prompt.service';
 import { imagesLead, personImagesLead, personaRules, sentence, tidyPrompt } from '../influencers/persona-text';
 
@@ -11,6 +11,7 @@ export interface PromptPersona {
 }
 
 export interface PromptScene {
+  type?: SceneType;
   outfitState: OutfitState;
   showsProduct: boolean;
   description: string;
@@ -18,8 +19,14 @@ export interface PromptScene {
 
 /** Which section-9 pattern a scene uses. */
 export function templateFor(scene: PromptScene): string {
+  if (scene.type === 'dance') return 'templates/image-dance';
   if (!scene.showsProduct && scene.outfitState === 'own_clothes') return 'templates/image-plain';
   return scene.outfitState === 'wearing_product' ? 'templates/image-wearing' : 'templates/image-holding';
+}
+
+/** Dance images aim for an alluring look, so the identity never leans on looking young. */
+export function adultIdentity(shortIdentity: string): string {
+  return shortIdentity.replace(/\byouthful\s+/gi, '');
 }
 
 /** "an oversized white t-shirt and grey lounge shorts." — keeps the article lowercase mid-sentence. */
@@ -85,7 +92,7 @@ export function buildImagePrompt(
       background: [backgroundSentence(input.backgroundIndex ?? null), poseSentence(input.poseIndex ?? null)].filter(Boolean).join(' '),
       name: first,
       garment: sentence(input.garmentParagraph),
-      shortIdentity: sentence(input.persona.shortIdentity),
+      shortIdentity: sentence(template === 'templates/image-dance' ? adultIdentity(input.persona.shortIdentity) : input.persona.shortIdentity),
       personaRules: personaRules(input.persona),
       homeOutfit: clause(input.persona.homeOutfit),
       scene: sentence(input.scene.description),

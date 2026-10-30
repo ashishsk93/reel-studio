@@ -15,7 +15,7 @@ export interface EditCandidate {
 
 export interface StoredAttachment {
   index: number;
-  kind: 'reference' | 'product' | 'asset';
+  kind: 'reference' | 'product' | 'asset' | 'video';
   id: string;
   path: string;
   label: string;

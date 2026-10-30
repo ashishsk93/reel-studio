@@ -134,9 +134,12 @@ export class ComposeService implements OnModuleInit {
     const existing = await this.prisma.composition.findUnique({ where: { projectId } });
     if (existing) return existing;
     const cta = await this.settings.get('compose.cta');
+    const project = await this.prisma.project.findUniqueOrThrow({ where: { id: projectId }, select: { format: true } });
+    // Dance Reels have no end card: render skips a CTA of 0 s.
+    const durationSec = project.format === 'dance' ? 0 : cta.durationSec;
     return this.prisma.composition.upsert({
       where: { projectId },
-      create: { projectId, cta: toJson({ ...cta, frame: null }), cover: toJson({}) },
+      create: { projectId, cta: toJson({ ...cta, durationSec, frame: null }), cover: toJson({}) },
       update: {},
     });
   }

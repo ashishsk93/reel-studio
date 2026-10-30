@@ -11,6 +11,7 @@ import {
   type CaptionPackageDto,
   type CaptionsUpdate,
   type CoverDto,
+  DANCE_CTA,
 } from '@reel/shared';
 import type { CaptionPackage } from '../generated/prisma/client';
 import { readJson, toJson } from '../common/json';
@@ -67,13 +68,14 @@ export function assembleCaption(
   parts: { hook: string; outfitLines: string[]; hashtags: string[] },
   disclosures: string[],
   productLines: string[] = [],
+  ctaLine: string = CTA_LINE,
 ): string {
   return [
     parts.hook.trim(),
     ...parts.outfitLines.map((l) => l.trim()),
     ...(productLines.length ? ['', ...productLines] : []),
     '',
-    CTA_LINE,
+    ctaLine,
     '',
     ...[...new Set(disclosures)],
     '',
@@ -376,7 +378,8 @@ export class CoverCaptionsService implements OnModuleInit {
     if (products.some((p) => !specs.has(p.id))) throw new Error('Run the product analysis first.');
     const inf = project.influencer;
     const persona = personaOf(inf);
-    const disclosures = [...new Set(products.flatMap((p) => readJson(z.array(z.string()), p.source.disclosureLines, [])))];
+    const dance = project.format === 'dance';
+    const disclosures = dance ? [] : [...new Set(products.flatMap((p) => readJson(z.array(z.string()), p.source.disclosureLines, [])))];
     const requiredTags = [BRAND_TAG, inf.hashtag].filter(Boolean);
     const segments = await this.compose.segments(projectId);
 
@@ -395,6 +398,7 @@ export class CoverCaptionsService implements OnModuleInit {
             `Reel: ${project.title} (${FORMATS[readJson(z.enum(STORY_FORMATS), project.format, 'classic')].label})`,
             ...products.map((p, i) => `Product ${i + 1}: ${p.title} · ${p.source.displayName}${productPriceLabel(p) ? ` · ${productPriceLabel(p)}` : ''}`),
             products.length > 1 ? 'The app adds a numbered list of the products with their prices after your outfit lines; keep the outfit lines about the Reel as a whole.' : '',
+            dance ? 'This Reel sells nothing: it is here to win followers. Write about the dance, the look and the place; never mention buying, links, stores or prices, and invite people to follow her. The app adds the follow line itself, not the LINK line; `dmMessage` is unused, so keep it to a few words.' : '',
             `Occasion: ${project.occasion}`,
             `Required hashtags: ${requiredTags.join(' ')}`,
             `On-screen texts in the Reel: ${segments.map((s) => `"${s.onScreenText}"`).join(', ')}`,
@@ -422,14 +426,17 @@ export class CoverCaptionsService implements OnModuleInit {
         { hook: out.hook, outfitLines: out.outfitLines, hashtags },
         disclosures,
         productLines(products.map((p) => ({ title: p.title, priceLabel: productPriceLabel(p) }))),
+        dance ? DANCE_CTA : CTA_LINE,
       ),
       hashtags: toJson(hashtags),
       firstComment: out.firstComment?.trim() || null,
-      dmTemplate: assembleDmFor(
-        out.dmMessage,
-        products.map((p) => ({ title: p.title, link: p.affiliateLink ?? p.productUrl })),
-        disclosures[0],
-      ),
+      dmTemplate: dance
+        ? ''
+        : assembleDmFor(
+            out.dmMessage,
+            products.map((p) => ({ title: p.title, link: p.affiliateLink ?? p.productUrl })),
+            disclosures[0],
+          ),
       coverTitles: toJson([]),
       sceneTexts: toJson(segments.map((s) => ({ sceneId: s.sceneId, text: s.onScreenText }))),
       checklist: toJson(DEFAULT_CHECKLIST.map((item) => ({ item, done: false }))),

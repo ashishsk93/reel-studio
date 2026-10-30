@@ -199,7 +199,7 @@ export class StoryboardService implements OnModuleInit {
     const built = this.buildFromFields(ctx, { ...fields, productId: product });
     const created = await this.prisma.$transaction(async (tx) => {
       for (const s of scenes.slice(order)) await tx.scene.update({ where: { id: s.id }, data: { order: s.order + 1 } });
-      return tx.scene.create({ data: { projectId, order, ...this.columns({ ...fields, productId: product }, built) } });
+      return tx.scene.create({ data: { projectId, order, showText: ctx.format !== 'dance', ...this.columns({ ...fields, productId: product }, built) } });
     });
     return this.toDto(created, ctx);
   }
@@ -281,7 +281,7 @@ export class StoryboardService implements OnModuleInit {
     await this.prisma.$transaction(async (tx) => {
       await tx.scene.deleteMany({ where: { projectId } });
       for (const [order, scene] of scenes.entries()) {
-        await tx.scene.create({ data: { projectId, order, ...this.columns(scene, built[order]) } });
+        await tx.scene.create({ data: { projectId, order, showText: ctx.format !== 'dance', ...this.columns(scene, built[order]) } });
       }
       await tx.project.update({ where: { id: projectId }, data: { storyboardNotes: toJson(notes) } });
     });
@@ -393,7 +393,7 @@ export class StoryboardService implements OnModuleInit {
       })),
       rules,
       maxRefs: Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.maxRefs])),
-      ctaSec: cta.durationSec,
+      ctaSec: project.format === 'dance' ? 0 : cta.durationSec,
     };
   }
 

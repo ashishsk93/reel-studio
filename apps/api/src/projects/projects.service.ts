@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import {
+  DANCE_MIN_AGE,
   FORMATS,
   PROJECT_STATUSES,
   ProductCreateFieldsSchema,
@@ -58,7 +59,7 @@ export class ProjectsService {
       const expected = data.products.reduce((n, p) => n + p.imageCount, 0);
       if (!files?.length) throw new BadRequestException('Add at least one photo for each product.');
       if (files.length !== expected) throw new BadRequestException(`Expected ${expected} photos for the products, got ${files.length}.`);
-      await this.assertInfluencer(data.influencerId);
+      await this.assertInfluencer(data.influencerId, data.format);
       await Promise.all(data.products.map((p) => this.assertSource(p.sourceId)));
       // Listing thumbnails can be tiny; image tools reject attachments under 300 px, so upscale them.
       const infos = await Promise.all(files.map(async (f) => upscaleIfSmall(f.path, await inspectImage(f.path, f.originalname))));
@@ -86,7 +87,7 @@ export class ProjectsService {
 
   async update(id: string, data: ProjectUpdate): Promise<ProjectDto> {
     const current = await this.find(id);
-    if (data.influencerId) await this.assertInfluencer(data.influencerId);
+    await this.assertInfluencer(data.influencerId ?? current.influencerId, data.format ?? format.parse(current.format));
     if (data.format && data.format !== current.format) {
       if ((current._count?.scenes ?? 0) > 0) throw new BadRequestException('Delete the storyboard before changing the format.');
       this.assertProductCount(data.format, current.products.length);
@@ -272,10 +273,13 @@ export class ProjectsService {
     }
   }
 
-  private async assertInfluencer(influencerId: string): Promise<void> {
+  private async assertInfluencer(influencerId: string, storyFormat: z.infer<typeof format>): Promise<void> {
     const influencer = await this.prisma.influencer.findUnique({ where: { id: influencerId } });
     if (!influencer) throw new BadRequestException('Influencer not found');
     if (influencer.status === 'archived') throw new BadRequestException(`${influencer.name} is archived.`);
+    if (storyFormat === 'dance' && influencer.age < DANCE_MIN_AGE) {
+      throw new BadRequestException(`Dance Reels need a character aged ${DANCE_MIN_AGE} or over; ${influencer.name} is ${influencer.age}.`);
+    }
   }
 
   private async assertSource(sourceId: string): Promise<void> {

@@ -47,6 +47,14 @@ export class VideoController {
     return this.assets.step(id);
   }
 
+  /** Multipart: the clip in `files`, and `confirmed` = "true" (adult performer, clip may be used). */
+  @Post('projects/:id/reference-video')
+  @UseInterceptors(FilesInterceptor('files'))
+  async referenceVideo(@Param('id') id: string, @UploadedFiles() files: Express.Multer.File[], @Body() fields: Record<string, unknown>) {
+    await this.video.setReferenceVideo(id, files?.[0], fields.confirmed === 'true');
+    return { ok: true };
+  }
+
   @Post('projects/:id/video-jobs/generate')
   async generate(@Param('id') id: string, @Body(new ZodPipe(VideoJobsGenerateSchema)) body: z.output<typeof VideoJobsGenerateSchema>) {
     await this.video.generate(id, body.force);

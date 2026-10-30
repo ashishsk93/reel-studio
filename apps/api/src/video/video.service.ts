@@ -1,7 +1,10 @@
 import { VersionPickService } from '../llm/version-pick.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { z } from 'zod';
 import {
+  REFERENCE_VIDEO,
   SCENE_TYPES,
   VIDEO_JOB_PURPOSES,
   hasSegment,
@@ -27,8 +30,10 @@ import { ProjectsService } from '../projects/projects.service';
 import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import type { StoredAttachment } from '../assets/edit-prompt';
+import { StoredReferenceVideoSchema } from '../projects/project.mapper';
+import { MediaService } from './media.service';
 import { creditEstimate, planMultiShot, planSingle, type PlanOptions } from './plan';
-import { VideoPromptError, buildMultiShotPrompt, buildSinglePrompt, buildTransitionPrompt, shotMarker } from './video-prompt';
+import { VideoPromptError, buildMotionTransferPrompt, buildMultiShotPrompt, buildSinglePrompt, buildTransitionPrompt, shotMarker } from './video-prompt';
 
 export const VIDEO_PROMPT_JOB = 'video.prompt';
 const RewritePayload = z.object({ jobId: z.string(), instruction: z.string() });
@@ -86,6 +91,7 @@ export class VideoService implements OnModuleInit {
     private readonly storage: StorageService,
     private readonly projects: ProjectsService,
     private readonly versionPick: VersionPickService,
+    private readonly media: MediaService,
   ) {}
 
   onModuleInit(): void {
@@ -150,7 +156,8 @@ export class VideoService implements OnModuleInit {
     const frames = first ? this.frames(ctx, first) : { attachments: [], missing: [] };
     const attachments: StoredAttachment[] = frames.attachments;
     missing.push(...frames.missing);
-    if (attachments.length === 2) notes.push('In Kling: image 1 is the start frame, image 2 the end frame.');
+    if (first?.type === 'dance') notes.push(...this.motionTransferNotes(ctx, first));
+    else if (attachments.length === 2) notes.push('In Kling: image 1 is the start frame, image 2 the end frame.');
 
     // Kling 3.0 on Higgsfield takes a start frame (and optionally an end frame), no reference images.
     if (present.length > 1) {
@@ -207,12 +214,61 @@ export class VideoService implements OnModuleInit {
         fileName: `${index}_${name}_scene${pad2(s.order + 1)}${ext(s.approvedAsset.path)}`,
       });
     }
+    if (scene.type === 'dance') {
+      const clip = readJson(StoredReferenceVideoSchema.nullable(), ctx.project.referenceVideo, null);
+      if (clip) {
+        const index = attachments.length + 1;
+        attachments.push({ index, kind: 'video', id: `${ctx.project.id}-reference-video`, path: clip.path, label: 'Reference video (moves)', fileName: `${index}_reference_video${ext(clip.path)}` });
+      } else {
+        missing.push('Upload the reference video above.');
+      }
+    }
     return { attachments, missing };
+  }
+
+  /** Which part of the clip this scene uses (scenes play one after another) and how to run each tool. */
+  private motionTransferNotes(ctx: VideoContext, scene: SceneWithImage): string[] {
+    const from = ctx.scenes.filter((s) => s.order < scene.order).reduce((sum, s) => sum + s.targetDurationSec, 0);
+    const to = from + scene.targetDurationSec;
+    const clip = readJson(StoredReferenceVideoSchema.nullable(), ctx.project.referenceVideo, null);
+    return [
+      ...(clip && to > clip.durationSec ? [`The clip is only ${clip.durationSec} s long; shorten the scenes in the storyboard.`] : []),
+      ...(ctx.scenes.length > 1 ? [`Trim the clip to ${from}–${to} s for this scene, so each background continues the dance instead of repeating it.`] : []),
+      'Kling Motion Control: image 1 is the character image, the video is the motion reference; set character orientation to "video" (up to 30 s).',
+      'Higgsfield Genjutsu: Motion Transfer mode, the video is the source clip, image 1 is the character reference (the source audio carries over).',
+      'Credits shown are the image-to-video estimate; motion transfer has its own rate.',
+    ];
+  }
+
+  /** The clip whose moves she performs. `confirmed` is the user's check that the performer is an adult and the clip may be used. */
+  async setReferenceVideo(projectId: string, file: Express.Multer.File | undefined, confirmed: boolean): Promise<void> {
+    try {
+      const project = await this.projects.find(projectId);
+      if (project.format !== 'dance') throw new BadRequestException('Only dance projects use a reference video.');
+      if (!file) throw new BadRequestException('Attach a video.');
+      if (!confirmed) throw new BadRequestException('Confirm the performer is an adult and that you may use this clip.');
+      const fileExt = path.extname(file.originalname).slice(1).toLowerCase();
+      if (!['mp4', 'mov'].includes(fileExt)) throw new BadRequestException('Upload an MP4 or MOV.');
+      if (file.size > REFERENCE_VIDEO.maxBytes) throw new BadRequestException('Keep the clip under 100 MB: Kling rejects larger ones.');
+      const probe = await this.media.probe(file.path, projectId);
+      if (probe.durationSec < REFERENCE_VIDEO.minSec || probe.durationSec > REFERENCE_VIDEO.maxSec) {
+        throw new BadRequestException(`The clip must be ${REFERENCE_VIDEO.minSec}–${REFERENCE_VIDEO.maxSec} s long (got ${probe.durationSec.toFixed(1)} s).`);
+      }
+      const rel = `projects/${projectId}/reference-video/${randomUUID()}.${fileExt}`;
+      await this.storage.moveInto(file.path, rel);
+      const old = readJson(StoredReferenceVideoSchema.nullable(), project.referenceVideo, null);
+      const clip = { path: rel, name: file.originalname, durationSec: Math.round(probe.durationSec * 10) / 10, width: probe.width, height: probe.height };
+      await this.prisma.project.update({ where: { id: projectId }, data: { referenceVideo: toJson(clip) } });
+      if (old) await this.storage.remove(old.path);
+    } finally {
+      await this.storage.discardTemp(file?.path);
+    }
   }
 
   /** Single-scene prompt: the transition prompt for a transition's "after" scene, else the image-to-video pattern. */
   singlePrompt(ctx: VideoContext, scene: SceneWithImage | undefined, motion?: string): string {
     const m = motion ?? scene?.motion ?? '';
+    if (scene?.type === 'dance') return buildMotionTransferPrompt({ ...ctx.persona, motion: m }, this.prompts);
     return scene && ctx.beforeOf.has(scene.id)
       ? buildTransitionPrompt({ ...ctx.persona, motion: m }, this.prompts)
       : buildSinglePrompt({ ...ctx.persona, motion: m }, this.prompts);
@@ -225,6 +281,11 @@ export class VideoService implements OnModuleInit {
       missing: built.missing,
       notes: built.notes,
     };
+  }
+
+  private isDance(ctx: VideoContext, job: VideoJob): boolean {
+    const first = this.expectedShots(job)[0];
+    return ctx.scenes.find((s) => s.id === first?.sceneId)?.type === 'dance';
   }
 
   jobTitle(job: VideoJob): string {
@@ -240,6 +301,7 @@ export class VideoService implements OnModuleInit {
     return {
       id: job.id,
       mode: readJson(z.enum(VIDEO_MODES), job.mode, 'multi_shot'),
+      motionTransfer: this.isDance(ctx, job),
       purpose: readJson(z.enum(VIDEO_JOB_PURPOSES), job.purpose, 'main'),
       order: job.order,
       active: job.active,
@@ -410,7 +472,7 @@ export class VideoService implements OnModuleInit {
         {
           type: 'text',
           text: [
-            `Mode: ${job.mode === 'multi_shot' ? 'Kling multi-shot (one prompt, several shots with hard cuts)' : 'Kling image-to-video, one shot'}`,
+            `Mode: ${job.mode === 'multi_shot' ? 'Kling multi-shot (one prompt, several shots with hard cuts)' : this.isDance(ctx, job) ? 'Motion transfer: the moves come from a reference video, so describe only her look and expression' : 'Kling image-to-video, one shot'}`,
             `Duration: ${shots[shots.length - 1]?.end ?? ''} s`,
             '',
             'Keep these verbatim:',

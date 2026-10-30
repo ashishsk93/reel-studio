@@ -56,10 +56,11 @@ export const SCENE_TYPES = [
   'styled',
   'transition_before',
   'transition_after',
+  'dance',
 ] as const;
 export type SceneType = (typeof SCENE_TYPES)[number];
 
-export const STORY_FORMATS = ['classic', 'haul', 'occasion', 'transition', 'three_ways'] as const;
+export const STORY_FORMATS = ['classic', 'haul', 'occasion', 'transition', 'three_ways', 'dance'] as const;
 export type StoryFormat = (typeof STORY_FORMATS)[number];
 
 export const OUTFIT_STATES = ['own_clothes', 'wearing_product'] as const;

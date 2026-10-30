@@ -197,3 +197,23 @@ describe('format rules', () => {
     ).toBe(5);
   });
 });
+
+describe('dance format', () => {
+  const persona = { name: 'Aanya Kapoor', shortIdentity: '22-year-old woman, soft youthful face with full cheeks', homeOutfit: '', forbiddenFeatures: [], conditionalFeatures: [] };
+
+  it('uses the dance template and drops youth wording from the identity', () => {
+    const scene = { type: 'dance' as const, outfitState: 'wearing_product' as const, showsProduct: true, description: 'She stands on a rooftop at golden hour' };
+    expect(templateFor(scene)).toBe('templates/image-dance');
+    const prompt = buildImagePrompt({ persona, scene, garmentParagraph: 'A red satin dress.', personCount: 2 }, new PromptService());
+    expect(prompt).toContain('soft face with full cheeks');
+    expect(prompt).not.toMatch(/youthful/i);
+    expect(prompt).toContain('grown woman');
+  });
+
+  it('allows 1-3 dance scenes', () => {
+    const s = { type: 'dance' as const, product: 1 };
+    const one = [{ backKnown: true, pieceCount: 1, availableRoles: ['front'] }];
+    expect(formatIssues([s, s, s], { format: 'dance', products: one })).toEqual([]);
+    expect(formatIssues([s, s, s, s], { format: 'dance', products: one })[0]).toContain('1-3');
+  });
+});

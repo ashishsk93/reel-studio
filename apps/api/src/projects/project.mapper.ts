@@ -114,10 +114,14 @@ export function toProjectSummaryDto(p: ProjectWithRelations, storage: StorageSer
   };
 }
 
+export const StoredReferenceVideoSchema = z.object({ path: z.string(), name: z.string(), durationSec: z.number(), width: z.number(), height: z.number() });
+
 export function toProjectDto(p: ProjectWithRelations, storage: StorageService): ProjectDto {
+  const clip = readJson(StoredReferenceVideoSchema.nullable(), p.referenceVideo, null);
   return {
     ...toProjectSummaryDto(p, storage),
     videoMode: readJson(z.enum(VIDEO_MODES), p.videoMode, 'single'),
+    referenceVideo: clip ? { url: storage.url(clip.path)!, name: clip.name, durationSec: clip.durationSec, width: clip.width, height: clip.height } : null,
     products: sortProducts(p.products).map((x, i) => toProductDto(x, i, storage)),
   };
 }

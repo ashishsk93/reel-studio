@@ -35,7 +35,8 @@ function PublishForm({ projectId, renderId, data }: { projectId: string; renderI
     caption: data.defaults.caption,
     firstComment: data.defaults.firstComment ?? "",
     shareToFeed: true,
-    autoReply: !data.otherAppReplies,
+    // No DM text means there is no link to send (dance Reels), so nothing to auto-reply with.
+    autoReply: !data.otherAppReplies && Boolean(data.defaults.dmText),
     dmText: data.defaults.dmText,
   }));
   const [open, setOpen] = useState(false);

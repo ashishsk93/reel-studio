@@ -37,6 +37,7 @@ export const SCENE_LABEL: Record<string, string> = {
   styled: "Styled look",
   transition_before: "Transition · before",
   transition_after: "Transition · after",
+  dance: "Dance",
 };
 
 /** A product as the storyboard offers it: number, title and the image roles it has. */

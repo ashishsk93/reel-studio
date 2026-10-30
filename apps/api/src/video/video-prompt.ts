@@ -78,6 +78,20 @@ export function buildTransitionPrompt(input: { name: string; forbiddenFeatures: 
   return prompt;
 }
 
+/** Motion transfer: the still gives her look and the place, the reference clip gives the moves. */
+export function buildMotionTransferPrompt(input: { name: string; forbiddenFeatures: string[]; motion: string }, prompts: PromptService): string {
+  const first = input.name.split(' ')[0] || input.name;
+  const prompt = tidyPrompt(
+    prompts.render('templates/video-motion', {
+      motion: sentence(input.motion || 'She keeps a confident smile and her eyes on the camera'),
+      name: first,
+      forbiddenReminder: forbiddenReminder(input.forbiddenFeatures),
+    }),
+  );
+  if (hasPlaceholder(prompt)) throw new VideoPromptError('The video prompt contains brackets or a placeholder.');
+  return prompt;
+}
+
 /** Single-scene image-to-video prompt (section 9 pattern). */
 export function buildSinglePrompt(input: { name: string; forbiddenFeatures: string[]; motion: string }, prompts: PromptService): string {
   const first = input.name.split(' ')[0] || input.name;

@@ -89,8 +89,9 @@ export function sceneIssues(scene: StoryboardScene, c: StoryboardConstraints): s
   }
   if (hasPlaceholder(scene.description)) issues.push('description contains brackets or placeholders');
   const words = wordCount(scene.onScreenText);
-  if (scene.type !== 'transition_before' && (words < 2 || words > 8)) issues.push(`on-screen text should be 3-7 words (got ${words})`);
-  if (scene.targetDurationSec < 1 || scene.targetDurationSec > 5) issues.push('targetDurationSec must be 1-5');
+  if (scene.type !== 'transition_before' && scene.type !== 'dance' && (words < 2 || words > 8)) issues.push(`on-screen text should be 3-7 words (got ${words})`);
+  const [minSec, maxSec] = scene.type === 'dance' ? [3, 15] : [1, 5];
+  if (scene.targetDurationSec < minSec || scene.targetDurationSec > maxSec) issues.push(`targetDurationSec must be ${minSec}-${maxSec}`);
   if (scene.place !== null && (scene.place < 1 || scene.place > c.placeCount)) {
     issues.push(c.placeCount ? `place must be 1-${c.placeCount} or null` : 'place must be null: she has no places yet');
   }
@@ -134,6 +135,9 @@ export function formatIssues(scenes: Array<Pick<StoryboardScene, 'type' | 'produ
     case 'three_ways':
       if (hooks !== 1 || scenes[0]?.type !== 'hook') issues.push('Start with exactly one "hook" scene');
       if (count('styled') !== 3) issues.push(`Use exactly three "styled" scenes (got ${count('styled')})`);
+      break;
+    case 'dance':
+      if (scenes.length < 1 || scenes.length > 3) issues.push(`Use 1-3 "dance" scenes (got ${scenes.length})`);
       break;
   }
   return issues;
