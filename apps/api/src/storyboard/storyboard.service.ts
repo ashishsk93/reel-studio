@@ -89,6 +89,8 @@ interface BoardContext {
   rules: RefRules;
   maxRefs: Record<string, number>;
   ctaSec: number;
+  /** Dance format: places of her recent dance Reels, so each new one looks different. */
+  usedSettings: string[];
 }
 
 export interface BuiltScene {
@@ -353,11 +355,19 @@ export class StoryboardService implements OnModuleInit {
     if (unanalysed.length) {
       throw new BadRequestException(`Run the product analysis first (${unanalysed.map((p) => p.title).join(', ')}).`);
     }
-    const [rules, tools, cta, scenes] = await Promise.all([
+    const [rules, tools, cta, scenes, danceScenes] = await Promise.all([
       this.settings.get('storyboard.refRules'),
       this.settings.get('tools.image'),
       this.settings.get('compose.cta'),
       this.prisma.scene.findMany({ where: { projectId }, include: { approvedAsset: true }, orderBy: { order: 'asc' } }),
+      project.format === 'dance'
+        ? this.prisma.scene.findMany({
+            where: { type: 'dance', projectId: { not: projectId }, project: { influencerId: project.influencerId } },
+            select: { setting: true },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          })
+        : [],
     ]);
     const inf = project.influencer;
     const references = inf.references.map((r) => ({ id: r.id, tags: refTags(r), path: r.path, sortOrder: r.sortOrder, note: r.note }));
@@ -394,6 +404,7 @@ export class StoryboardService implements OnModuleInit {
       rules,
       maxRefs: Object.fromEntries(Object.entries(tools).map(([k, v]) => [k, v.maxRefs])),
       ctaSec: project.format === 'dance' ? 0 : cta.durationSec,
+      usedSettings: [...new Set(danceScenes.map((s) => s.setting))],
     };
   }
 
@@ -626,6 +637,7 @@ export class StoryboardService implements OnModuleInit {
       `Format: ${rule.label} (${ctx.format})`,
       `Project title (its name only, never on-screen text): ${ctx.title}`,
       `Occasion / mood: ${ctx.occasion}`,
+      ...(ctx.usedSettings.length ? [`Places already used in her dance Reels: ${ctx.usedSettings.join('; ')}`] : []),
     ].join('\n');
   }
 

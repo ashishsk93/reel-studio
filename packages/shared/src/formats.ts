@@ -57,7 +57,7 @@ export const FORMATS: Record<StoryFormat, FormatRule> = {
   },
   dance: {
     label: 'Dance (motion transfer)',
-    description: 'One dress, 1–3 backgrounds: she performs the moves of a reference clip (Kling Motion Control or Higgsfield Genjutsu).',
+    description: 'One dress, one background: she performs the moves of a reference clip (Kling Motion Control or Higgsfield Genjutsu).',
     titleExample: 'Red satin dress, rooftop dance',
     products: { min: 1, max: 1 },
     reelSec: { min: 10, max: 30 },

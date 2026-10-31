@@ -135,8 +135,9 @@ export class VideoService implements OnModuleInit {
     };
   }
 
-  planOptions(tools: SettingValue<'tools.video'>): PlanOptions {
-    return { maxSec: tools.maxMultiShotSec, minSec: tools.minSec, paddingSec: tools.shotPaddingSec };
+  /** Motion transfer runs as long as the reference clip, past Kling's image-to-video limit. */
+  planOptions(tools: SettingValue<'tools.video'>, format?: string): PlanOptions {
+    return { maxSec: format === 'dance' ? REFERENCE_VIDEO.maxSec : tools.maxMultiShotSec, minSec: tools.minSec, paddingSec: tools.shotPaddingSec };
   }
 
   expectedShots(job: VideoJob): ExpectedShotDto[] {
@@ -233,7 +234,8 @@ export class VideoService implements OnModuleInit {
     const clip = readJson(StoredReferenceVideoSchema.nullable(), ctx.project.referenceVideo, null);
     return [
       ...(clip && to > clip.durationSec ? [`The clip is only ${clip.durationSec} s long; shorten the scenes in the storyboard.`] : []),
-      ...(ctx.scenes.length > 1 ? [`Trim the clip to ${from}–${to} s for this scene, so each background continues the dance instead of repeating it.`] : []),
+      ...(clip && ctx.scenes.length === 1 && to < clip.durationSec ? [`The scene is ${to} s but the clip runs ${clip.durationSec} s; lengthen the scene in the storyboard to use all of it.`] : []),
+      ...(ctx.scenes.length > 1 ? [`Trim the clip to ${from}–${to} s for this scene, so each camera angle continues the dance instead of repeating it.`] : []),
       'Kling Motion Control: image 1 is the character image, the video is the motion reference; set character orientation to "video" (up to 30 s).',
       'Higgsfield Genjutsu: Motion Transfer mode, the video is the source clip, image 1 is the character reference (the source audio carries over).',
       'Credits shown are the image-to-video estimate; motion transfer has its own rate.',
@@ -345,7 +347,7 @@ export class VideoService implements OnModuleInit {
       throw new ConflictException(`${uploads} video(s) are uploaded for the current ${mode === 'multi_shot' ? 'runs' : 'scenes'}. Regenerating replaces them; confirm to continue.`);
     }
 
-    const options = this.planOptions(ctx.tools);
+    const options = this.planOptions(ctx.tools, ctx.project.format);
     const planScenes = ctx.scenes.map((s) => ({ id: s.id, order: s.order, setting: s.setting, outfitState: s.outfitState, targetDurationSec: s.targetDurationSec, onScreenText: s.onScreenText }));
     const plan = mode === 'multi_shot' ? planMultiShot(planScenes, options) : planSingle(planScenes, options);
 
@@ -410,7 +412,7 @@ export class VideoService implements OnModuleInit {
     const ctx = await this.context(scene.projectId);
     const [p] = planSingle(
       [{ id: scene.id, order: scene.order, setting: scene.setting, outfitState: scene.outfitState, targetDurationSec: scene.targetDurationSec, onScreenText: scene.onScreenText }],
-      this.planOptions(ctx.tools),
+      this.planOptions(ctx.tools, ctx.project.format),
     );
     const withImage = ctx.scenes.find((s) => s.id === scene.id);
     const before = ctx.beforeOf.get(scene.id);

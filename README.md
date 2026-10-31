@@ -83,7 +83,7 @@ Pick one when creating a project (details in [docs/formats.md](docs/formats.md))
 | Price-cap haul | 2–5 | Title hook, then a quick try-on of each product with its own store and price badge |
 | Occasion edit | 2–5 | Same, themed by occasion ("3 Diwali looks") |
 | Outfit transition | 1–3 | Her own clothes → a quick spin or hand-across-lens → wearing it (Kling start + end frames) |
-| Dance (motion transfer) | 1 | 1–3 full-body stills in different places; she performs a reference clip (upload it under **Video prompts**) with Kling Motion Control or Higgsfield Genjutsu |
+| Dance (motion transfer) | 1 | One full-body still in one place (up to 3 only for new camera angles there), with a different place from her recent dance Reels; she performs a reference clip (upload it under **Video prompts**) with Kling Motion Control or Higgsfield Genjutsu |
 | One piece, 3 ways | 1 | The same piece styled for three occasions |
 
 Each product has its own photos, analysis, store, price, links and an optional on-screen note. Captions list every product with its price, and the LINK DM lists every link.

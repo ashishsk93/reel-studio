@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { IMAGE_MODELS, OUTFIT_STATES, PRODUCT_IMAGE_ROLES, SCENE_TYPES, SHOT_KINDS, type StoryFormat } from '../enums.js';
-import { FORMATS, hasSegment } from '../formats.js';
+import { FORMATS, REFERENCE_VIDEO, hasSegment } from '../formats.js';
 import { hasPlaceholder } from './product.js';
 
 export const StoryboardSceneSchema = z.object({
@@ -90,7 +90,7 @@ export function sceneIssues(scene: StoryboardScene, c: StoryboardConstraints): s
   if (hasPlaceholder(scene.description)) issues.push('description contains brackets or placeholders');
   const words = wordCount(scene.onScreenText);
   if (scene.type !== 'transition_before' && scene.type !== 'dance' && (words < 2 || words > 8)) issues.push(`on-screen text should be 3-7 words (got ${words})`);
-  const [minSec, maxSec] = scene.type === 'dance' ? [3, 15] : [1, 5];
+  const [minSec, maxSec] = scene.type === 'dance' ? [3, REFERENCE_VIDEO.maxSec] : [1, 5];
   if (scene.targetDurationSec < minSec || scene.targetDurationSec > maxSec) issues.push(`targetDurationSec must be ${minSec}-${maxSec}`);
   if (scene.place !== null && (scene.place < 1 || scene.place > c.placeCount)) {
     issues.push(c.placeCount ? `place must be 1-${c.placeCount} or null` : 'place must be null: she has no places yet');
@@ -99,7 +99,10 @@ export function sceneIssues(scene: StoryboardScene, c: StoryboardConstraints): s
 }
 
 /** Order and count rules of each format (docs/formats.md); empty when the plan fits. */
-export function formatIssues(scenes: Array<Pick<StoryboardScene, 'type' | 'product'>>, c: Pick<StoryboardConstraints, 'format' | 'products'>): string[] {
+export function formatIssues(
+  scenes: Array<Pick<StoryboardScene, 'type' | 'product'> & Partial<Pick<StoryboardScene, 'setting' | 'place'>>>,
+  c: Pick<StoryboardConstraints, 'format' | 'products'>,
+): string[] {
   const issues: string[] = [];
   const n = c.products.length;
   const count = (type: string) => scenes.filter((s) => s.type === type).length;
@@ -138,6 +141,7 @@ export function formatIssues(scenes: Array<Pick<StoryboardScene, 'type' | 'produ
       break;
     case 'dance':
       if (scenes.length < 1 || scenes.length > 3) issues.push(`Use 1-3 "dance" scenes (got ${scenes.length})`);
+      if (new Set(scenes.map((s) => `${s.setting}|${s.place}`)).size > 1) issues.push('Every "dance" scene must have the same setting and place; only the camera angle may change');
       break;
   }
   return issues;

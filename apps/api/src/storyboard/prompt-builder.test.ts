@@ -216,4 +216,11 @@ describe('dance format', () => {
     expect(formatIssues([s, s, s], { format: 'dance', products: one })).toEqual([]);
     expect(formatIssues([s, s, s, s], { format: 'dance', products: one })[0]).toContain('1-3');
   });
+
+  it('keeps every dance scene in one place', () => {
+    const s = { type: 'dance' as const, product: 1, setting: 'rooftop at golden hour', place: null };
+    const one = [{ backKnown: true, pieceCount: 1, availableRoles: ['front'] }];
+    expect(formatIssues([s, s], { format: 'dance', products: one })).toEqual([]);
+    expect(formatIssues([s, { ...s, setting: 'neon-lit lounge' }], { format: 'dance', products: one })[0]).toContain('same setting');
+  });
 });

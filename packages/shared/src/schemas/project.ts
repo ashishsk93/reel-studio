@@ -127,7 +127,7 @@ export const SceneEditableSchema = z.object({
   description: z.string().trim().min(1, 'Describe the scene'),
   productRoles: z.array(z.enum(PRODUCT_IMAGE_ROLES)),
   onScreenText: z.string().trim(),
-  targetDurationSec: z.number().min(0.5).max(15),
+  targetDurationSec: z.number().min(0.5).max(30),
   imageModel: z.enum(IMAGE_MODELS),
   imageModelReason: z.string().trim(),
   motion: z.string().trim(),

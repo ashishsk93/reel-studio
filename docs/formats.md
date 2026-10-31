@@ -9,7 +9,7 @@ A project picks a **format** when it is created. The format decides how many pro
 | Occasion edit | `occasion` | 2–5 | hook, then one `try_on` per product | 10–20 s |
 | Outfit transition | `transition` | 1–3 | optional hook, then per product `transition_before` + `transition_after` | 10–20 s |
 | One piece, 3 ways | `three_ways` | 1 | hook (holding it up), then 3 `styled` scenes | 14–20 s |
-| Dance (motion transfer) | `dance` | 1 | 1–3 `dance` scenes, one per background | 10–30 s |
+| Dance (motion transfer) | `dance` | 1 | One `dance` scene in one place; up to 3 only for new camera angles in that place | 10–30 s |
 
 A 2–4 s CTA end card follows in every format. The ranges include it.
 

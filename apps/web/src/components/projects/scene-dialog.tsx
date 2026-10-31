@@ -251,7 +251,7 @@ export function SceneDialog({
               type="number"
               step={0.5}
               min={0.5}
-              max={15}
+              max={30}
               value={form.targetDurationSec}
               onChange={(e) => set("targetDurationSec", Number(e.target.value))}
             />
