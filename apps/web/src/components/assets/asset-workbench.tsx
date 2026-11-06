@@ -219,7 +219,7 @@ function AssetDetail({
   const reviewing = Boolean(asset.reviewJob && asset.reviewJob.status !== "failed");
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(220px,300px)_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(220px,300px)_1fr]">
       <div className="flex flex-col gap-3">
         <ZoomImage src={asset.url} alt={`Version ${asset.version}`} zoom={2} className="w-full max-w-[300px] rounded-xl border bg-muted">
           {showZone && safeZone && (

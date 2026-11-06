@@ -318,7 +318,7 @@ function SceneCard({
   };
 
   return (
-    <article className="grid gap-4 lg:grid-cols-[240px_1fr]">
+    <article className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-full bg-primary font-display text-sm font-bold text-primary-foreground">

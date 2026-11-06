@@ -113,7 +113,7 @@ function BriefForm() {
         images (anchor first). Generating the reference images with Higgsfield prompts comes in phase 3.
       </p>
       <div className="grid gap-4">
-        <div className="grid gap-4 sm:grid-cols-[1fr_100px_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_100px_1fr]">
           {text("name", "Name (optional)", "Let Claude choose")}
           <div>
             <Label className="mb-1.5 block">Age</Label>
@@ -134,7 +134,7 @@ function BriefForm() {
             onChange={(e) => set("lookNotes", e.target.value)}
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {text("mustHave", "Must have", "e.g. short wavy hair")}
           {text("mustAvoid", "Must avoid", "e.g. no tattoos, no nose ring")}
         </div>

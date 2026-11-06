@@ -64,7 +64,7 @@ export function CreatorPlan({ influencer }: { influencer: InfluencerDetailDto })
   const approved = counted.filter((t) => t.status === "approved").length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[230px_1fr]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[230px_1fr]">
       <aside className="flex flex-col gap-3 self-start">
         <div>
           <p className="text-sm font-semibold">

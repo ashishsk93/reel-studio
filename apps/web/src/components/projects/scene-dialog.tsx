@@ -210,7 +210,7 @@ export function SceneDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Type">
             <EnumSelect value={form.type} options={SCENE_TYPES} labels={SCENE_LABEL} onChange={(v) => set("type", v as SceneEditable["type"])} />
           </Field>

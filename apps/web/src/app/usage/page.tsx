@@ -92,7 +92,7 @@ function Usage() {
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Stat label="Claude cost" value={usd(data.total.costUsd)} sub={inr(data.total.costUsd)} />
             <Stat
               label="Calls"
@@ -111,7 +111,7 @@ function Usage() {
 
           {data.byDay.length > 1 && <DailyChart days={data.byDay} inr={inr} />}
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Breakdown title="By task" rows={data.byTask} inr={inr} />
             <Breakdown title="By model" rows={data.byModel} inr={inr} />
           </div>

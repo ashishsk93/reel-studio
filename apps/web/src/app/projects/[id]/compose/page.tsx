@@ -166,7 +166,7 @@ function Overlays({ projectId, step, setData }: { projectId: string; step: Compo
   const seg = step.segments.find((s) => s.id === selectedId) ?? step.segments[0];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <ol className="flex flex-col gap-2">
         {step.segments.map((s) => (
           <SegmentRow

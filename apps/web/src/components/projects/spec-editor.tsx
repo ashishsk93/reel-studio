@@ -99,7 +99,7 @@ function Field({ name, value, onChange }: { name: string; value: Json; onChange:
     return (
       <fieldset className="rounded-lg border p-3">
         <legend className="px-1 text-xs font-medium">{label(name)}</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {Object.entries(value).map(([k, v]) => (
             <Field key={k} name={k} value={v} onChange={(next) => onChange({ ...value, [k]: next })} />
           ))}
@@ -113,7 +113,7 @@ function Field({ name, value, onChange }: { name: string; value: Json; onChange:
 export function SpecEditor({ value, onChange }: { value: ProductSpec; onChange: (next: ProductSpec) => void }) {
   const record = value as unknown as Record<string, Json>;
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {Object.entries(record).map(([key, v]) => (
         <div key={key} className={typeof v === "object" ? "md:col-span-2" : undefined}>
           <Field name={key} value={v} onChange={(next) => onChange({ ...record, [key]: next } as unknown as ProductSpec)} />

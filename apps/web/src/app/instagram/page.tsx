@@ -189,7 +189,7 @@ function ReplySettingsCard({ status }: { status: InstagramStatusDto }) {
   return (
     <Card title="Reply settings" description="Shared by every Reel. Only the DM text is set per Reel, below.">
       <form
-        className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           save.mutate();

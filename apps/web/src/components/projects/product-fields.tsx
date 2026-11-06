@@ -91,7 +91,7 @@ export function ProductFields({
         <SourcePicker sources={sources} value={value.sourceId} onChange={(id) => set("sourceId", id)} />
         <FieldError message={errors.sourceId} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[160px_1fr]">
         <div>
           <Label className="mb-1.5 block">Price (₹)</Label>
           <Input type="number" min={1} value={value.priceInr} onChange={(e) => set("priceInr", e.target.value)} placeholder="499" />
@@ -107,7 +107,7 @@ export function ProductFields({
           />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">Product URL (optional)</Label>
           <Input value={value.productUrl} onChange={(e) => setLink("productUrl", e.target.value)} placeholder="https://" />
@@ -140,7 +140,7 @@ export function productRange(format: StoryFormat): string {
 /** The story format cards shown when creating a project. */
 export function FormatPicker({ value, onChange }: { value: StoryFormat; onChange: (format: StoryFormat) => void }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {STORY_FORMATS.map((f) => {
         const rule = FORMATS[f];
         const Icon = FORMAT_ICON[f];

@@ -19,7 +19,7 @@ import { projectKeys, useInfluencers, useSources } from "@/lib/queries";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="grid gap-6 border-t py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_1fr]">
+    <section className="grid grid-cols-1 gap-6 border-t py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_1fr]">
       <div>
         <h2 className="text-sm font-semibold">{title}</h2>
         {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
@@ -126,7 +126,7 @@ export default function NewProjectPage() {
         </Section>
 
         <Section title="The Reel" hint="The title is the project's name; it isn't shown in the Reel.">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label className="mb-1.5 block">{format === "classic" ? "Product title" : "Title"}</Label>
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={rule.titleExample} />

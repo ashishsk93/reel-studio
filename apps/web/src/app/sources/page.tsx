@@ -38,7 +38,7 @@ export default function SourcesPage() {
         description="The store logo and price badge appear on product-showing segments. Disclosure lines go into every caption and DM reply."
       />
       {error && <ErrorState error={error} />}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {isPending
           ? Array.from({ length: SOURCES.length }, (_, i) => <Skeleton key={i} className="h-[520px] rounded-xl" />)
           : data?.map((source) => <SourceCard key={source.id} source={source} />)}

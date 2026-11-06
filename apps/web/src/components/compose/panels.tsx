@@ -44,13 +44,13 @@ export function CtaPanel({ projectId, step, setData }: Props) {
   const chosenSeg = step.segments.find((s) => s.id === draft.frame?.segmentId);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
         <div>
           <Label className="mb-1.5 block text-xs">Text (&ldquo;LINK&rdquo; gets the pink pill; a trailing 👇 bounces)</Label>
           <Input value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} className="font-display font-semibold" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5 block text-xs">Duration: {draft.durationSec}s</Label>
             <input
@@ -132,7 +132,7 @@ export function CtaPanel({ projectId, step, setData }: Props) {
       <div className="flex flex-col items-center gap-2">
         <Expandable items={[{ url: step.ctaPreviewUrl, label: "End card preview" }]}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={step.ctaPreviewUrl} alt="End card preview" className="aspect-[9/16] w-[300px] rounded-2xl border bg-black object-cover" />
+          <img src={step.ctaPreviewUrl} alt="End card preview" className="aspect-[9/16] w-[300px] max-w-full rounded-2xl border bg-black object-cover" />
         </Expandable>
         <p className="text-center text-xs text-muted-foreground">Still preview; the render adds the zoom and the bouncing pointer.</p>
       </div>
@@ -212,7 +212,7 @@ export function CoverPanel({ projectId, step, setData }: Props) {
               </button>
             ))}
           </div>
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
             <div className="flex flex-col gap-2 rounded-xl border bg-card p-4">
               <Label className="text-xs">Title</Label>
               {cover.titleOptions.map((t) => (
@@ -267,7 +267,7 @@ export function CaptionsPanel({ projectId, step, setData }: Props) {
   });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
           <p className="flex-1 text-sm text-muted-foreground">

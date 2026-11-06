@@ -53,7 +53,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-6">
         <Card title="Environment" description="Read from .env at startup. Edit .env and restart the API to change these.">
           {health.data ? (
-            <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[180px_1fr]">
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[180px_1fr]">
               <dt className="text-muted-foreground">LLM mode</dt>
               <dd className="font-mono">{health.data.llmMode}</dd>
               <dt className="text-muted-foreground">API key</dt>
@@ -202,7 +202,7 @@ function ToolsCard({ image, video }: { image: SettingRow<"tools.image">; video: 
         </Button>
       }
     >
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {(Object.keys(img) as Array<keyof typeof img>).map((model) => (
           <div key={model} className="flex flex-col gap-3 rounded-lg border p-4">
             <p className="text-sm font-medium">{img[model].label}</p>
@@ -218,7 +218,7 @@ function ToolsCard({ image, video }: { image: SettingRow<"tools.image">; video: 
         ))}
         <div className="flex flex-col gap-3 rounded-lg border p-4 md:col-span-2">
           <p className="text-sm font-medium">{vid.label} (video)</p>
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             {num("Max length per run (s)", vid.maxMultiShotSec, (n) => setVid({ ...vid, maxMultiShotSec: n }))}
             {num("Shortest generation (s)", vid.minSec, (n) => setVid({ ...vid, minSec: n }))}
             {num("Extra seconds per shot", vid.shotPaddingSec, (n) => setVid({ ...vid, shotPaddingSec: n }), 0.5)}

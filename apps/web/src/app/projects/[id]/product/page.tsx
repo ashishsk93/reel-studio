@@ -92,7 +92,7 @@ function DetailsCard({ project }: { project: ProjectDto }) {
           <Icon className="size-3" /> {rule.label} · {productRange(project.format)}
         </Badge>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <Label className="mb-1.5 block">{project.format === "classic" ? "Product title" : "Title"}</Label>
           <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={rule.titleExample} />

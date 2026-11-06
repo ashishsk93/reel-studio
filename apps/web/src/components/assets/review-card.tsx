@@ -168,7 +168,7 @@ function Checklist({ checklist }: { checklist: NonNullable<AssetDto["review"]>["
   const groups = [...new Set(checklist.map((c) => c.group))];
   if (groups.length === 0) return null;
   return (
-    <section className="grid gap-3 sm:grid-cols-2">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {groups.map((group) => (
         <div key={group} className="rounded-xl border bg-card p-3">
           <h4 className="mb-2 text-xs font-semibold">{GROUP_LABEL[group]}</h4>

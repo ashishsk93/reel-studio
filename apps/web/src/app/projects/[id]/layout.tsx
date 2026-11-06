@@ -31,7 +31,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={project.coverUrl} alt="" className="size-14 rounded-xl border object-cover" />
             )}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-[min(100%,16rem)] flex-1">
               <h1 className="truncate font-display text-xl font-semibold">{project.title}</h1>
               <p className="text-sm text-muted-foreground">
                 {FORMATS[project.format].label} · {project.influencer.name} · {project.sources.map((s) => s.displayName).join(", ")} ·{" "}

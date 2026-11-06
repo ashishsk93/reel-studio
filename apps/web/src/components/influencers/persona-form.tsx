@@ -60,7 +60,7 @@ function Field({
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <section className="grid gap-6 border-t py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_1fr]">
+    <section className="grid grid-cols-1 gap-6 border-t py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_1fr]">
       <div>
         <h3 className="text-sm font-semibold">{title}</h3>
         {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
@@ -84,7 +84,7 @@ export function PersonaForm({
   return (
     <div>
       <Section title="Basics">
-        <div className="grid gap-4 sm:grid-cols-[1fr_100px_1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_100px_1fr]">
           <Field label="Name" error={errors.name}>
             <Input value={value.name} onChange={(e) => set("name", e.target.value)} />
           </Field>
@@ -100,7 +100,7 @@ export function PersonaForm({
             <Input value={value.city} onChange={(e) => set("city", e.target.value)} />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_200px]">
           <Field label="Lane" hint="Niche, occasions and festivals" error={errors.lane}>
             <Input value={value.lane} onChange={(e) => set("lane", e.target.value)} />
           </Field>

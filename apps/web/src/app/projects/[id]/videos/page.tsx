@@ -419,7 +419,7 @@ function VideoDetail({
       )}
 
       {processed ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
           <TimelineEditor asset={asset} expected={job.expectedShots} sceneLabel={sceneLabel} videoRef={videoRef} onSaved={onChanged} />
           <div>
             {asset.review ? (

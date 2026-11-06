@@ -228,7 +228,7 @@ function SpecView({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_220px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_220px]">
         <div className="flex flex-col gap-5">
           <Card
             title="Garment paragraph"
@@ -258,7 +258,7 @@ function SpecView({
           <Card title="Must match" hint="Checked in every image and video review (6–10 items).">
             <div className="flex flex-col gap-2">
               {draft.mustMatch.map((m, i) => (
-                <div key={i} className="grid gap-2 sm:grid-cols-[200px_1fr_auto]">
+                <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[200px_1fr_auto]">
                   <Input value={m.label} onChange={(e) => setMust(i, { label: e.target.value })} placeholder="What to check" />
                   <Input value={m.expected} onChange={(e) => setMust(i, { expected: e.target.value })} placeholder="What correct looks like" />
                   <Button

@@ -127,7 +127,7 @@ function RenderView({
   const failed = render.qa?.checks.filter((c) => !c.ok) ?? [];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="flex flex-col gap-3">
         {video && (
           <Expandable items={[{ url: video.url, kind: "video", label: "final.mp4" }]} button>
@@ -163,7 +163,7 @@ function RenderView({
               </Button>
             )}
           </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {render.files.map((f) => (
               <li key={f.name}>
                 <a href={f.url} download={f.name} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:border-primary/50">
@@ -193,7 +193,7 @@ function RenderView({
                 {failed.length ? `${failed.length} to look at` : "all passed"}
               </Badge>
             </h3>
-            <ul className="grid gap-1.5 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {render.qa.checks.map((c) => (
                 <li key={c.label} className="flex items-start gap-2 text-sm">
                   {c.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />}

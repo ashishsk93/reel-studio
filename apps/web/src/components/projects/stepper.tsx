@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { Check, Lock } from "lucide-react";
 import { STEPS, canOpenStep, isStepDone, type ProjectStatus, type StepKey } from "@reel/shared";
 import { cn } from "@/lib/utils";
@@ -15,8 +16,19 @@ export function Stepper({
   furthest: ProjectStatus;
   current: StepKey | undefined;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  // On narrow screens the stepper scrolls sideways; keep the current step in view.
+  useEffect(() => {
+    const nav = navRef.current;
+    const el = nav?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!nav || !el || nav.scrollWidth <= nav.clientWidth) return;
+    const n = nav.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    nav.scrollLeft += r.left - n.left - (n.width - r.width) / 2;
+  }, [current]);
+
   return (
-    <nav className="mb-8 overflow-x-auto" data-stepper>
+    <nav ref={navRef} className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:mb-8 sm:px-0" data-stepper>
       <ol className="flex min-w-max items-center gap-1 rounded-xl border bg-card p-1.5">
         {STEPS.map((step, i) => {
           const open = canOpenStep(step.key, furthest);

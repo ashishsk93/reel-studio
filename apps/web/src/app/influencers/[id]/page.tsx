@@ -221,7 +221,7 @@ function ProfileTab({ influencer }: { influencer: InfluencerDetailDto }) {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
       <div className="rounded-xl border bg-card p-6">
         <PersonaForm value={draft} onChange={setDraft} errors={errors} />
         <div className="sticky bottom-0 mt-6 flex items-center justify-end gap-2 border-t bg-card pt-4">
